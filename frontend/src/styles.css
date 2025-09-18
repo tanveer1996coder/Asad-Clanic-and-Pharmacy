@@ -136,6 +136,32 @@ button {
     margin-bottom: 12px;
 }
 
+/* autocomplete suggestion list */
+.suggestions-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 38px;
+    background: #fff;
+    border: 1px solid #e6e9ef;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    border-radius: 6px;
+    max-height: 240px;
+    overflow: auto;
+    z-index: 60;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+.suggestions-list li {
+    padding: 8px 10px;
+    cursor: pointer;
+}
+.suggestions-list li.active,
+.suggestions-list li:hover {
+    background: #f1f5f9;
+}
+
 .sales-day-header {
     font-weight: 600;
     margin: 8px 0;

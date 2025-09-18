@@ -9,6 +9,9 @@ export default function AddSaleForm({ onSaleAdded }) {
   const [quantity, setQuantity] = useState(1);
   const [price, setPrice] = useState('');
   const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10));
+  const [query, setQuery] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [activeIndex, setActiveIndex] = useState(-1);
 
   useEffect(() => {
     let mounted = true;
@@ -37,7 +40,17 @@ export default function AddSaleForm({ onSaleAdded }) {
   useEffect(() => {
     const selected = products.find((p) => p.id === productId);
     if (selected && (!price || price === '')) setPrice(String(selected.price));
+    if (selected) setQuery(selected.name || '');
   }, [productId, products]);
+
+  useEffect(() => {
+    // update suggestions based on query
+    if (!query) return setSuggestions([]);
+    const q = query.trim().toLowerCase();
+    const list = products.filter((p) => (p.name || '').toLowerCase().includes(q)).slice(0, 8);
+    setSuggestions(list);
+    setActiveIndex(-1);
+  }, [query, products]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -62,13 +75,54 @@ export default function AddSaleForm({ onSaleAdded }) {
     <Card title="Add Sale">
       <form className="form-compact" onSubmit={handleSubmit}>
         <Field label="Product">
-          <select value={productId} onChange={(e) => setProductId(e.target.value)}>
-            {products.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              placeholder="Search product..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault();
+                  setActiveIndex((i) => Math.min(i + 1, suggestions.length - 1));
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault();
+                  setActiveIndex((i) => Math.max(i - 1, 0));
+                } else if (e.key === 'Enter') {
+                  if (activeIndex >= 0 && suggestions[activeIndex]) {
+                    const s = suggestions[activeIndex];
+                    setProductId(s.id);
+                    setPrice(String(s.price));
+                    setQuery(s.name);
+                    setSuggestions([]);
+                    e.preventDefault();
+                  }
+                } else if (e.key === 'Escape') {
+                  setSuggestions([]);
+                }
+              }}
+            />
+            {suggestions && suggestions.length > 0 && (
+              <ul className="suggestions-list">
+                {suggestions.map((s, idx) => (
+                  <li
+                    key={s.id}
+                    className={idx === activeIndex ? 'active' : ''}
+                    onMouseDown={(ev) => {
+                      // onMouseDown to prevent blur before click
+                      ev.preventDefault();
+                      setProductId(s.id);
+                      setPrice(String(s.price));
+                      setQuery(s.name);
+                      setSuggestions([]);
+                    }}
+                  >
+                    {s.name}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </Field>
         <Field label="Quantity">
           <input type="number" value={quantity} min={1} onChange={(e) => setQuantity(e.target.value)} />
