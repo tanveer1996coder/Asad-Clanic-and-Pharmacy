@@ -44,7 +44,6 @@ export default function AddSaleForm({ onSaleAdded }) {
   }, [productId, products]);
 
   useEffect(() => {
-    // update suggestions based on query
     if (!query) return setSuggestions([]);
     const q = query.trim().toLowerCase();
     const list = products.filter((p) => (p.name || '').toLowerCase().includes(q)).slice(0, 8);
@@ -53,23 +52,35 @@ export default function AddSaleForm({ onSaleAdded }) {
   }, [query, products]);
 
   async function handleSubmit(e) {
-    e.preventDefault();
-    if (!client) return;
-    if (!productId) return window.alert('Select a product');
-    const q = parseInt(quantity, 10);
-    const p = parseFloat(price);
-    if (Number.isNaN(q) || q <= 0 || Number.isNaN(p)) return window.alert('Provide valid quantity and price');
-    const payload = { product_id: productId, quantity: q, price_at_sale: p, sale_date: saleDate };
-    try {
-      const { error } = await client.from('sales').insert(payload);
-      if (error) throw error;
-      setQuantity(1);
-      setPrice('');
-      if (typeof onSaleAdded === 'function') onSaleAdded();
-    } catch (err) {
-      window.alert('Insert sale failed: ' + (err.message || err));
-    }
+  e.preventDefault();
+  if (!client) return;
+  if (!productId) return window.alert('Select a product');
+  const q = parseInt(quantity, 10);
+  const p = parseFloat(price);
+  if (Number.isNaN(q) || q <= 0 || Number.isNaN(p))
+    return window.alert('Provide valid quantity and price');
+
+  // 1. Insert sale
+  const payload = { product_id: productId, quantity: q, price_at_sale: p, sale_date: saleDate };
+  try {
+    const { error } = await client.from('sales').insert(payload);
+    if (error) throw error;
+
+    // 2. Decrease stock in products
+    const { error: stockErr } = await client.rpc('decrease_stock', {
+      p_id: productId,
+      q_sold: q,
+    });
+    if (stockErr) throw stockErr;
+
+    setQuantity(1);
+    setPrice('');
+    if (typeof onSaleAdded === 'function') onSaleAdded();
+  } catch (err) {
+    window.alert('Insert sale failed: ' + (err.message || err));
   }
+}
+
 
   return (
     <Card title="Add Sale">
@@ -109,7 +120,6 @@ export default function AddSaleForm({ onSaleAdded }) {
                     key={s.id}
                     className={idx === activeIndex ? 'active' : ''}
                     onMouseDown={(ev) => {
-                      // onMouseDown to prevent blur before click
                       ev.preventDefault();
                       setProductId(s.id);
                       setPrice(String(s.price));

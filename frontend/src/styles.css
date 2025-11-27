@@ -184,7 +184,138 @@ button {
     font-size: 12px;
     color: #64748b
 }
+/* ===== Tabs at top of screen ===== */
+.tabs {
+    display: flex;
+    gap: 0;
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+}
 
+.tabs button {
+    flex: 1;
+    padding: 12px 0;
+    font-size: 15px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    color: #334155;
+}
+
+.tabs button:hover {
+    background: #f1f5f9;
+}
+
+.tabs button.active {
+    background: #0f172a;
+    color: #fff;
+}
+
+/* ===== Stock table ===== */
+.table {
+    width: 100%;
+    /* full width */
+    border-collapse: collapse;
+}
+
+.table th,
+.table td {
+    border-bottom: 1px solid #eef2f7;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 14px;
+}
+
+.table thead th {
+    position: sticky;
+    top: 0;
+    background: #f9fafb;
+    z-index: 5;
+}
+
+/* keep table scrollable on small devices */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+/* Optional: make Save button prettier inside stock table */
+.table button {
+    background: #0f172a;
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+
+/* ===== Responsive tweaks for tabs and table ===== */
+@media (max-width: 699px) {
+    .tabs button {
+        font-size: 14px;
+        padding: 10px 0;
+    }
+
+    .table th,
+    .table td {
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+}
+/* Stock search bar */
+.stock-search {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+
+.stock-search input {
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+    width: 260px;
+    max-width: 100%;
+}
+
+/* Make the stock table fill full width */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.table-wide {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-wide th,
+.table-wide td {
+    border-bottom: 1px solid #eef2f7;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 14px;
+}
+
+.table-wide thead th {
+    position: sticky;
+    top: 0;
+    background: #f9fafb;
+    z-index: 5;
+}
+
+@media (max-width: 699px) {
+    .stock-search input {
+        width: 100%;
+    }
+
+    .table-wide th,
+    .table-wide td {
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+}
 /* Responsive rules (mobile-first) */
 /* Mobile: stack columns, smaller paddings, table horizontal scroll */
 @media (max-width: 699px) {
@@ -232,4 +363,55 @@ button {
 @media (min-width: 1200px) {
     .left-col { width: 360px; }
     .container { padding: 20px; }
+}
+
+/* very narrow mobile screens: 250px - 400px */
+@media (max-width: 400px) and (min-width: 250px) {
+    .container {
+        padding: 8px;
+        gap: 8px;
+        flex-direction: column;
+        overflow: visible; /* ensure page scroll reaches all content */
+    }
+    .left-col, .right-col {
+        width: 100%;
+        box-shadow: none;
+        padding: 6px;
+        overflow: visible; /* allow vertical page scroll to reach right column */
+        max-height: none;
+    }
+    .form-compact input[type="text"],
+    .form-compact input[type="number"],
+    .form-compact input[type="date"],
+    .form-compact select,
+    .form-compact textarea {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 10px;
+        padding: 8px;
+    }
+    .suggestions-list {
+        top: 42px;
+        max-height: 180px;
+        font-size: 14px;
+    }
+    .table-list { overflow: visible; }
+
+    /* ensure action buttons don't collapse together in narrow product list */
+    .table-list tbody tr td:last-child {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap:8px; /* space between Edit and Delete */
+        align-items: center;
+    }
+    /* add spacing between price column and action buttons */
+    .table-list tbody tr td:nth-child(2) {
+        padding-right: 14px;
+    }
+        .table-list tbody tr td:last-child button{
+            padding:6px 12px;
+            width: 100%;
+            font-size: 14px;
+        }
 }
