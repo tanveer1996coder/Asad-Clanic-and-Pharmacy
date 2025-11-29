@@ -31,6 +31,7 @@ import { toast } from 'react-toastify';
 import { generatePOPDF } from '../../utils/poPdfGenerator';
 import { openWhatsApp } from '../../utils/whatsappHelper';
 import { printPO } from '../../utils/printPO';
+import html2canvas from 'html2canvas';
 
 export default function POReceiptModal({ open, onClose, purchaseOrder, poItems, supplier, settings }) {
     const theme = useTheme();
@@ -83,6 +84,28 @@ export default function POReceiptModal({ open, onClose, purchaseOrder, poItems, 
         }
     };
 
+    const handleGenerateImage = async () => {
+        try {
+            const element = document.getElementById('po-receipt-content');
+            if (!element) return null;
+
+            const canvas = await html2canvas(element, {
+                scale: 2,
+                backgroundColor: '#ffffff',
+                logging: false,
+            });
+
+            return new Promise((resolve) => {
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, 'image/png');
+            });
+        } catch (error) {
+            console.error('Error generating image:', error);
+            return null;
+        }
+    };
+
     const handleWhatsApp = async () => {
         const phone = supplier?.phone || supplier?.supplier_contacts?.find(c => c.is_primary)?.phone;
         if (!phone) {
@@ -90,20 +113,76 @@ export default function POReceiptModal({ open, onClose, purchaseOrder, poItems, 
             return;
         }
 
-        // Download PDF first so user can attach it
+        const loadingToast = toast.loading('Generating receipt image...');
+
         try {
-            await handleDownloadPDF();
-            toast.info('PDF downloaded! Please attach it to the WhatsApp chat.');
+            const imageBlob = await handleGenerateImage();
+            if (!imageBlob) {
+                throw new Error('Failed to generate image');
+            }
+
+            const imageFile = new File(
+                [imageBlob],
+                `PO-${purchaseOrder.po_number}.png`,
+                { type: 'image/png' }
+            );
+
+            // Mobile: Use Web Share API for seamless sharing
+            if (navigator.share && navigator.canShare && navigator.canShare({ files: [imageFile] })) {
+                toast.update(loadingToast, {
+                    render: 'Opening share menu...',
+                    type: 'info',
+                    isLoading: false,
+                    autoClose: 2000
+                });
+
+                await navigator.share({
+                    title: `PO ${purchaseOrder.po_number}`,
+                    text: `Purchase Order: ${purchaseOrder.po_number}\n\nPlease find the order details in the attached image.\n\nThank you!`,
+                    files: [imageFile]
+                });
+
+                toast.success('Shared successfully!');
+            } else {
+                // Desktop: Download and open WhatsApp Web
+                const url = URL.createObjectURL(imageBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `PO-${purchaseOrder.po_number}.png`;
+                link.click();
+                URL.revokeObjectURL(url);
+
+                toast.update(loadingToast, {
+                    render: 'Image downloaded! Opening WhatsApp - please attach it.',
+                    type: 'success',
+                    isLoading: false,
+                    autoClose: 5000
+                });
+
+                const message = `Purchase Order: ${purchaseOrder.po_number}\n\nPlease find the order details in the downloaded image file.\n\nThank you!`;
+
+                setTimeout(() => {
+                    openWhatsApp(phone, message);
+                }, 1000);
+            }
         } catch (e) {
-            console.error('Error downloading PDF for WhatsApp:', e);
-        }
+            console.error('Error handling WhatsApp share:', e);
 
-        const message = `Purchase Order: ${purchaseOrder.po_number}\n\nItems:\n${poItems.map(item => `- ${item.product_name} x${item.quantity_ordered}`).join('\n')}\n\nPlease confirm availability and send invoice. Thank you!`;
+            if (e.name === 'AbortError') {
+                toast.dismiss(loadingToast);
+                return;
+            }
 
-        // Small delay to let PDF download start
-        setTimeout(() => {
+            toast.update(loadingToast, {
+                render: 'Failed to share. Opening WhatsApp with text only.',
+                type: 'warning',
+                isLoading: false,
+                autoClose: 3000
+            });
+
+            const message = `Purchase Order: ${purchaseOrder.po_number}\n\nItems:\n${poItems.map(item => `- ${item.product_name} x${item.quantity_ordered}`).join('\n')}\n\nPlease confirm availability.`;
             openWhatsApp(phone, message);
-        }, 1000);
+        }
     };
 
     return (
@@ -122,7 +201,11 @@ export default function POReceiptModal({ open, onClose, purchaseOrder, poItems, 
 
             <DialogContent>
                 {/* Professional Receipt Card */}
-                <Paper elevation={3} sx={{ p: 3, bgcolor: 'grey.50', border: '1px solid', borderColor: 'grey.300' }}>
+                <Paper
+                    id="po-receipt-content"
+                    elevation={3}
+                    sx={{ p: 3, bgcolor: 'grey.50', border: '1px solid', borderColor: 'grey.300' }}
+                >
                     {/* Header */}
                     <Box textAlign="center" mb={2}>
                         <Typography variant="h5" fontWeight={700} color="primary" gutterBottom>

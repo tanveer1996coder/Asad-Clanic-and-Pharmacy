@@ -303,8 +303,8 @@ export default function ReportsPage() {
                                             <Bar dataKey="total_quantity" fill="#6366f1" />
                                         </BarChart>
                                     </ResponsiveContainer>
-                                    <TableContainer sx={{ mt: 3 }}>
-                                        <Table>
+                                    <TableContainer sx={{ mt: 3, overflowX: 'auto' }}>
+                                        <Table sx={{ minWidth: 600 }}>
                                             <TableHead>
                                                 <TableRow>
                                                     <TableCell><strong>Product</strong></TableCell>
@@ -339,8 +339,8 @@ export default function ReportsPage() {
                             {expiryReport.length === 0 ? (
                                 <Typography color="text.secondary">No products near expiry!</Typography>
                             ) : (
-                                <TableContainer>
-                                    <Table>
+                                <TableContainer sx={{ overflowX: 'auto' }}>
+                                    <Table sx={{ minWidth: 600 }}>
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell><strong>Product</strong></TableCell>
@@ -381,8 +381,8 @@ export default function ReportsPage() {
                             {lowStockReport.length === 0 ? (
                                 <Typography color="text.secondary">All products are well stocked!</Typography>
                             ) : (
-                                <TableContainer>
-                                    <Table>
+                                <TableContainer sx={{ overflowX: 'auto' }}>
+                                    <Table sx={{ minWidth: 600 }}>
                                         <TableHead>
                                             <TableRow>
                                                 <TableCell><strong>Product</strong></TableCell>

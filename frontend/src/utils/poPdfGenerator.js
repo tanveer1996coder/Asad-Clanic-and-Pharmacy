@@ -1,5 +1,5 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 
 export const generatePOPDF = async (po, poItems, settings) => {
     try {
@@ -83,7 +83,7 @@ export const generatePOPDF = async (po, poItems, settings) => {
             ];
         });
 
-        doc.autoTable({
+        autoTable(doc, {
             head: [tableColumn],
             body: tableRows,
             startY: infoY + 25,
@@ -104,7 +104,7 @@ export const generatePOPDF = async (po, poItems, settings) => {
         });
 
         // Notes
-        let finalY = doc.lastAutoTable.finalY + 10;
+        let finalY = (doc.lastAutoTable && doc.lastAutoTable.finalY) || (infoY + 30) + 10;
         if (po?.notes) {
             doc.setFontSize(10);
             doc.setFont(undefined, 'bold');

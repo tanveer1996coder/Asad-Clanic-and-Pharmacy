@@ -221,7 +221,14 @@ export default function PurchaseOrdersPage() {
 
     return (
         <Container maxWidth="xl">
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Box
+                display="flex"
+                flexDirection={isMobile ? 'column' : 'row'}
+                justifyContent="space-between"
+                alignItems={isMobile ? 'flex-start' : 'center'}
+                gap={2}
+                mb={3}
+            >
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Purchase Orders
                 </Typography>
@@ -229,6 +236,7 @@ export default function PurchaseOrdersPage() {
                     variant="contained"
                     startIcon={<Add />}
                     onClick={handleCreateNew}
+                    fullWidth={isMobile}
                 >
                     New Purchase Order
                 </Button>

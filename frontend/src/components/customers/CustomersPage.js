@@ -176,18 +176,30 @@ export default function CustomersPage() {
 
     return (
         <Container maxWidth="lg">
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Box
+                display="flex"
+                flexDirection={isMobile ? 'column' : 'row'}
+                justifyContent="space-between"
+                alignItems={isMobile ? 'flex-start' : 'center'}
+                gap={2}
+                mb={3}
+            >
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Customers
                 </Typography>
-                <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()}>
+                <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => handleOpenDialog()}
+                    fullWidth={isMobile}
+                >
                     Add Customer
                 </Button>
             </Box>
 
             <Card>
-                <TableContainer>
-                    <Table>
+                <TableContainer sx={{ overflowX: 'auto' }}>
+                    <Table sx={{ minWidth: 700 }}>
                         <TableHead>
                             <TableRow>
                                 <TableCell><strong>Name</strong></TableCell>
@@ -441,8 +453,8 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
                         {frequentItems.length === 0 ? (
                             <Typography color="text.secondary">No frequent items found yet.</Typography>
                         ) : (
-                            <TableContainer>
-                                <Table size="small">
+                            <TableContainer sx={{ overflowX: 'auto' }}>
+                                <Table size="small" sx={{ minWidth: 500 }}>
                                     <TableHead>
                                         <TableRow>
                                             <TableCell>Product</TableCell>

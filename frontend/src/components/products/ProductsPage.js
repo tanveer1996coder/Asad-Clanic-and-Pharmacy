@@ -245,7 +245,14 @@ export default function ProductsPage() {
 
     return (
         <Container maxWidth="xl">
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Box
+                display="flex"
+                flexDirection={isMobile ? 'column' : 'row'}
+                justifyContent="space-between"
+                alignItems={isMobile ? 'flex-start' : 'center'}
+                gap={2}
+                mb={3}
+            >
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Products
                 </Typography>
@@ -253,6 +260,7 @@ export default function ProductsPage() {
                     variant="contained"
                     startIcon={<Add />}
                     onClick={() => handleOpenDialog()}
+                    fullWidth={isMobile}
                 >
                     Add Product
                 </Button>
@@ -369,8 +377,8 @@ export default function ProductsPage() {
                 </Box>
             ) : (
                 <Card>
-                    <TableContainer>
-                        <Table>
+                    <TableContainer sx={{ overflowX: 'auto' }}>
+                        <Table sx={{ minWidth: 800 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell><strong>Name</strong></TableCell>

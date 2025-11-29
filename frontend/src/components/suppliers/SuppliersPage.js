@@ -309,11 +309,23 @@ export default function SuppliersPage() {
 
     return (
         <Container maxWidth="lg">
-            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+            <Box
+                display="flex"
+                flexDirection={isMobile ? 'column' : 'row'}
+                justifyContent="space-between"
+                alignItems={isMobile ? 'flex-start' : 'center'}
+                gap={2}
+                mb={3}
+            >
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Suppliers
                 </Typography>
-                <Button variant="contained" startIcon={<Add />} onClick={() => handleOpenDialog()}>
+                <Button
+                    variant="contained"
+                    startIcon={<Add />}
+                    onClick={() => handleOpenDialog()}
+                    fullWidth={isMobile}
+                >
                     Add Supplier
                 </Button>
             </Box>
