@@ -1,19 +1,17 @@
 {
   "files": {
     "main.css": "/Asad-Clanic-and-Pharmacy/static/css/main.c9fbee29.css",
-    "main.js": "/Asad-Clanic-and-Pharmacy/static/js/main.42355169.js",
-    "static/js/239.8eacf619.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/239.8eacf619.chunk.js",
+    "main.js": "/Asad-Clanic-and-Pharmacy/static/js/main.578f0ef3.js",
     "static/js/213.454bf950.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/213.454bf950.chunk.js",
     "static/js/455.856076c4.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/455.856076c4.chunk.js",
     "index.html": "/Asad-Clanic-and-Pharmacy/index.html",
     "main.c9fbee29.css.map": "/Asad-Clanic-and-Pharmacy/static/css/main.c9fbee29.css.map",
-    "main.42355169.js.map": "/Asad-Clanic-and-Pharmacy/static/js/main.42355169.js.map",
-    "239.8eacf619.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/239.8eacf619.chunk.js.map",
+    "main.578f0ef3.js.map": "/Asad-Clanic-and-Pharmacy/static/js/main.578f0ef3.js.map",
     "213.454bf950.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/213.454bf950.chunk.js.map",
     "455.856076c4.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/455.856076c4.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.c9fbee29.css",
-    "static/js/main.42355169.js"
+    "static/js/main.578f0ef3.js"
   ]
 }
