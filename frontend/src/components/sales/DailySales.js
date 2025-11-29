@@ -12,7 +12,7 @@ import { supabase } from '../../supabaseClient';
 import { formatCurrency } from '../../utils/formatters';
 import { toast } from 'react-toastify';
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import useSettings from '../../hooks/useSettings';
 
 export default function DailySales() {
@@ -47,7 +47,8 @@ export default function DailySales() {
         const { data, error } = await supabase
             .from('sales')
             .select('*, products(name)')
-            .eq('sale_date', today);
+            .eq('sale_date', today)
+            .is('deleted_at', null);
 
         if (error) {
             console.error('Error fetching today sales:', error);
@@ -66,43 +67,51 @@ export default function DailySales() {
             return;
         }
 
-        const doc = new jsPDF();
-        const today = new Date().toLocaleDateString();
+        try {
+            const doc = new jsPDF();
+            const today = new Date().toLocaleDateString();
+            const storeName = settings?.store_name || 'Medical Store';
+            const currency = settings?.currency_symbol || '$';
 
-        // Header
-        doc.setFontSize(20);
-        doc.text(settings.store_name || 'Medical Store', 105, 15, { align: 'center' });
-        doc.setFontSize(14);
-        doc.text(`Daily Sales Report - ${today}`, 105, 25, { align: 'center' });
+            // Header
+            doc.setFontSize(20);
+            doc.text(storeName, 105, 15, { align: 'center' });
+            doc.setFontSize(14);
+            doc.text(`Daily Sales Report - ${today}`, 105, 25, { align: 'center' });
 
-        // Summary
-        doc.setFontSize(12);
-        doc.text(`Total Sales Count: ${todaySales.length}`, 14, 35);
-        doc.text(`Total Revenue: ${formatCurrency(totalAmount, settings.currency_symbol)}`, 14, 42);
+            // Summary
+            doc.setFontSize(12);
+            doc.text(`Total Sales Count: ${todaySales.length}`, 14, 35);
+            doc.text(`Total Revenue: ${formatCurrency(totalAmount, currency)}`, 14, 42);
 
-        // Table
-        const tableColumn = ["Time", "Product", "Qty", "Price", "Total"];
-        const tableRows = todaySales.map(sale => [
-            new Date(sale.created_at).toLocaleTimeString(),
-            sale.products?.name || 'Unknown',
-            sale.quantity,
-            formatCurrency(sale.price_at_sale, settings.currency_symbol),
-            formatCurrency(sale.quantity * sale.price_at_sale, settings.currency_symbol)
-        ]);
+            // Table
+            const tableColumn = ["Time", "Product", "Qty", "Price", "Total"];
+            const tableRows = todaySales.map(sale => [
+                new Date(sale.created_at).toLocaleTimeString(),
+                sale.products?.name || 'Unknown',
+                sale.quantity,
+                formatCurrency(sale.price_at_sale, currency),
+                formatCurrency(sale.quantity * sale.price_at_sale, currency)
+            ]);
 
-        doc.autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            startY: 50,
-        });
+            // Use autoTable as a function
+            autoTable(doc, {
+                head: [tableColumn],
+                body: tableRows,
+                startY: 50,
+            });
 
-        // Footer
-        const finalY = doc.lastAutoTable.finalY || 50;
-        doc.text('_______________________', 150, finalY + 30);
-        doc.text('Signature', 150, finalY + 40);
+            // Footer
+            const finalY = (doc.lastAutoTable && doc.lastAutoTable.finalY) || 50;
+            doc.text('_______________________', 150, finalY + 30);
+            doc.text('Signature', 150, finalY + 40);
 
-        doc.save(`daily_sales_${today.replace(/\//g, '-')}.pdf`);
-        toast.success('Daily report downloaded!');
+            doc.save(`daily_sales_${today.replace(/\//g, '-')}.pdf`);
+            toast.success('Daily report downloaded!');
+        } catch (error) {
+            console.error('Error generating PDF:', error);
+            toast.error(`Failed to generate PDF: ${error.message}`);
+        }
     };
 
     return (

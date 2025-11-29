@@ -67,6 +67,69 @@ export const AuthProvider = ({ children }) => {
         });
 
         if (error) throw error;
+
+        // Device Verification Logic
+        try {
+            const { getDeviceId, getDeviceName } = require('../utils/deviceUtils');
+            const deviceId = getDeviceId();
+            const deviceName = getDeviceName();
+            const userId = data.user.id;
+
+            // Check if device exists
+            const { data: existingDevice } = await supabase
+                .from('device_tokens')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('device_id', deviceId)
+                .single();
+
+            if (existingDevice) {
+                // Update usage
+                await supabase
+                    .from('device_tokens')
+                    .update({ last_used_at: new Date().toISOString() })
+                    .eq('id', existingDevice.id);
+            } else {
+                // Check if this is the FIRST device for the user
+                const { count } = await supabase
+                    .from('device_tokens')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('user_id', userId);
+
+                const isFirstDevice = count === 0;
+
+                // Register new device
+                await supabase
+                    .from('device_tokens')
+                    .insert({
+                        user_id: userId,
+                        device_id: deviceId,
+                        device_name: deviceName,
+                        is_trusted: isFirstDevice // Auto-trust first device
+                    });
+
+                if (!isFirstDevice) {
+                    console.warn('New device detected. Verification required in production.');
+                }
+            }
+        } catch (deviceError) {
+            console.error('Device tracking failed:', deviceError);
+        }
+
+        return data;
+    };
+
+    const signInWithGoogle = async () => {
+        if (!supabase) throw new Error('Supabase not configured');
+
+        const { data, error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin + '/dashboard'
+            }
+        });
+
+        if (error) throw error;
         return data;
     };
 
@@ -105,6 +168,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         signUp,
         signIn,
+        signInWithGoogle,
         signOut,
         resetPassword,
         updatePassword,

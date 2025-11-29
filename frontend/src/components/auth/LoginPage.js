@@ -15,11 +15,13 @@ import {
     IconButton,
     LinearProgress,
     Chip,
+    Divider,
 } from '@mui/material';
 import {
     Visibility,
     VisibilityOff,
     Refresh,
+    Google as GoogleIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
@@ -64,34 +66,13 @@ const generateStrongPassword = () => {
 
 export default function LoginPage() {
     const navigate = useNavigate();
-    const { signIn, signUp } = useAuth();
+    const { signIn, signInWithGoogle } = useAuth();
 
-    const [tabValue, setTabValue] = useState(0);
     const [email, setEmail] = useState('');
-    const [phone, setPhone] = useState('');
     const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [storeName, setStoreName] = useState('');
     const [showPassword, setShowPassword] = useState(false);
-    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    const [success, setSuccess] = useState('');
-
-    const passwordStrength = checkPasswordStrength(password);
-
-    const handleTabChange = (event, newValue) => {
-        setTabValue(newValue);
-        setError('');
-        setSuccess('');
-    };
-
-    const handleGeneratePassword = () => {
-        const newPassword = generateStrongPassword();
-        setPassword(newPassword);
-        setConfirmPassword(newPassword);
-        toast.success('Password generated! Click the eye icon to view it.');
-    };
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -108,50 +89,6 @@ export default function LoginPage() {
         }
     };
 
-    const handleSignUp = async (e) => {
-        e.preventDefault();
-        setError('');
-        setSuccess('');
-        setLoading(true);
-
-        // Validation
-        if (password !== confirmPassword) {
-            setError('Passwords do not match');
-            setLoading(false);
-            return;
-        }
-
-        if (password.length < 8) {
-            setError('Password must be at least 8 characters');
-            setLoading(false);
-            return;
-        }
-
-        if (passwordStrength.label === 'Weak') {
-            setError('Please use a stronger password or generate one');
-            setLoading(false);
-            return;
-        }
-
-        try {
-            await signUp(email, password, {
-                store_name: storeName,
-                phone: phone || null,
-            });
-            setSuccess('Account created! Please check your email to verify, then log in.');
-            setEmail('');
-            setPassword('');
-            setConfirmPassword('');
-            setStoreName('');
-            setPhone('');
-            setTimeout(() => setTabValue(0), 2000);
-        } catch (err) {
-            setError(err.message || 'Failed to create account');
-        } finally {
-            setLoading(false);
-        }
-    };
-
     return (
         <Container maxWidth="sm" sx={{ mt: 8 }}>
             <Paper elevation={3} sx={{ p: 4 }}>
@@ -162,204 +99,83 @@ export default function LoginPage() {
                     Manage your pharmacy inventory with ease
                 </Typography>
 
-                <Tabs value={tabValue} onChange={handleTabChange} centered sx={{ mb: 3 }}>
-                    <Tab label="Login" />
-                    <Tab label="Sign Up" />
-                </Tabs>
-
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
                         {error}
                     </Alert>
                 )}
 
-                {success && (
-                    <Alert severity="success" sx={{ mb: 2 }} onClose={() => setSuccess('')}>
-                        {success}
-                    </Alert>
-                )}
+                <Box component="form" onSubmit={handleLogin}>
+                    <TextField
+                        fullWidth
+                        label="Email"
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        margin="normal"
+                        required
+                        autoComplete="email"
+                    />
 
-                {/* Login Tab */}
-                {tabValue === 0 && (
-                    <Box component="form" onSubmit={handleLogin}>
-                        <TextField
-                            fullWidth
-                            label="Email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            margin="normal"
-                            required
-                            autoComplete="email"
-                        />
+                    <TextField
+                        fullWidth
+                        label="Password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        margin="normal"
+                        required
+                        autoComplete="current-password"
+                        InputProps={{
+                            endAdornment: (
+                                <InputAdornment position="end">
+                                    <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                                        {showPassword ? <VisibilityOff /> : <Visibility />}
+                                    </IconButton>
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
 
-                        <TextField
-                            fullWidth
-                            label="Password"
-                            type={showPassword ? 'text' : 'password'}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            margin="normal"
-                            required
-                            autoComplete="current-password"
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
                         <Button
-                            type="submit"
-                            fullWidth
-                            variant="contained"
-                            size="large"
-                            disabled={loading}
-                            sx={{ mt: 3 }}
+                            size="small"
+                            onClick={() => navigate('/forgot-password')}
+                            sx={{ textTransform: 'none' }}
                         >
-                            {loading ? <CircularProgress size={24} /> : 'Login'}
+                            Forgot Password?
                         </Button>
                     </Box>
-                )}
 
-                {/* Sign Up Tab */}
-                {tabValue === 1 && (
-                    <Box component="form" onSubmit={handleSignUp}>
-                        <TextField
-                            fullWidth
-                            label="Store Name"
-                            value={storeName}
-                            onChange={(e) => setStoreName(e.target.value)}
-                            margin="normal"
-                            required
-                            helperText="Your pharmacy or store name"
-                        />
-                        <TextField
-                            fullWidth
-                            label="Email"
-                            type="email"
-                            value={email}
-                            onChange={(e) => setEmail(e.target.value)}
-                            margin="normal"
-                            required
-                            autoComplete="email"
-                        />
-                        <TextField
-                            fullWidth
-                            label="Phone Number (Optional)"
-                            type="tel"
-                            value={phone}
-                            onChange={(e) => setPhone(e.target.value)}
-                            margin="normal"
-                            placeholder="+1 234 567 8900"
-                            helperText="For account recovery"
-                        />
+                    <Button
+                        type="submit"
+                        fullWidth
+                        variant="contained"
+                        size="large"
+                        disabled={loading}
+                        sx={{ mt: 3 }}
+                    >
+                        {loading ? <CircularProgress size={24} /> : 'Login'}
+                    </Button>
 
-                        <TextField
-                            fullWidth
-                            label="Password"
-                            type={showPassword ? 'text' : 'password'}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            margin="normal"
-                            required
-                            autoComplete="new-password"
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
+                    <Divider sx={{ my: 2 }}>OR</Divider>
 
-                        {password && (
-                            <Box sx={{ mt: 1, mb: 2 }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                                    <Typography variant="caption" color="text.secondary">
-                                        Password Strength:
-                                    </Typography>
-                                    <Chip
-                                        label={passwordStrength.label}
-                                        size="small"
-                                        color={passwordStrength.color}
-                                    />
-                                </Box>
-                                <LinearProgress
-                                    variant="determinate"
-                                    value={passwordStrength.score}
-                                    color={passwordStrength.color}
-                                    sx={{ height: 6, borderRadius: 3 }}
-                                />
-                            </Box>
-                        )}
-
-                        <Button
-                            fullWidth
-                            variant="outlined"
-                            startIcon={<Refresh />}
-                            onClick={handleGeneratePassword}
-                            sx={{ mb: 2 }}
-                        >
-                            Generate Strong Password
-                        </Button>
-
-                        <TextField
-                            fullWidth
-                            label="Confirm Password"
-                            type={showConfirmPassword ? 'text' : 'password'}
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            margin="normal"
-                            required
-                            autoComplete="new-password"
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end">
-                                            {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-
-                        <Button
-                            type="submit"
-                            fullWidth
-                            variant="contained"
-                            size="large"
-                            disabled={loading}
-                            sx={{ mt: 3 }}
-                        >
-                            {loading ? <CircularProgress size={24} /> : 'Create Account'}
-                        </Button>
-                    </Box>
-                )}
-
-                <Typography variant="body2" align="center" color="text.secondary" sx={{ mt: 3 }}>
-                    {tabValue === 0 ? (
-                        <>
-                            Don't have an account?{' '}
-                            <Button size="small" onClick={() => setTabValue(1)}>
-                                Sign Up
-                            </Button>
-                        </>
-                    ) : (
-                        <>
-                            Already have an account?{' '}
-                            <Button size="small" onClick={() => setTabValue(0)}>
-                                Login
-                            </Button>
-                        </>
-                    )}
-                </Typography>
+                    <Button
+                        fullWidth
+                        variant="outlined"
+                        size="large"
+                        onClick={async () => {
+                            try {
+                                await signInWithGoogle();
+                            } catch (error) {
+                                setError(error.message);
+                            }
+                        }}
+                        startIcon={<GoogleIcon />}
+                    >
+                        Sign in with Google
+                    </Button>
+                </Box>
             </Paper>
         </Container>
     );

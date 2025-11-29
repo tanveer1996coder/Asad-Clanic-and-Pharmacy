@@ -42,6 +42,7 @@ const menuItems = [
     { text: 'Sales', icon: <ShoppingCartIcon />, path: '/sales' },
     { text: 'Sales History', icon: <AssessmentIcon />, path: '/sales-history' },
     { text: 'Stock', icon: <LocalShippingIcon />, path: '/stock' },
+    { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
     { text: 'Suppliers', icon: <PeopleIcon />, path: '/suppliers' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },

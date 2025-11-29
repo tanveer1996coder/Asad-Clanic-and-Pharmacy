@@ -9,12 +9,14 @@ import theme from './theme/theme';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import LoginPage from './components/auth/LoginPage';
+import ForgotPasswordPage from './components/auth/ForgotPasswordPage';
 import Layout from './components/shared/Layout';
 import Dashboard from './components/dashboard/Dashboard';
 import ProductsPage from './components/products/ProductsPage';
 import SalesPage from './components/sales/SalesPage';
 import StockPage from './components/stock/StockPage';
 import SuppliersPage from './components/suppliers/SuppliersPage';
+import CustomersPage from './components/customers/CustomersPage';
 import ReportsPage from './components/reports/ReportsPage';
 import SettingsPage from './components/settings/SettingsPage';
 import SalesHistoryPage from './components/sales/SalesHistoryPage';
@@ -36,6 +38,7 @@ export default function App() {
           <Routes>
             {/* Public Route */}
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
             {/* Protected Routes */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
@@ -95,6 +98,16 @@ export default function App() {
                 <ProtectedRoute>
                   <Layout>
                     <SuppliersPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/customers"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <CustomersPage />
                   </Layout>
                 </ProtectedRoute>
               }

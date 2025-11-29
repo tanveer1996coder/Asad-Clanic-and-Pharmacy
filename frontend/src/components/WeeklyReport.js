@@ -10,81 +10,68 @@ export default function WeeklyReport() {
 
   useEffect(() => {
     let mounted = true;
-    async function fetch() {
-      if (!client) return;
-      try {
-        // Fetch raw sales with product name and aggregate client-side into weekly summaries
-        const { data, error } = await client
-          .from('sales')
-          .select('id, product_id, quantity, price_at_sale, sale_date, created_at, products(name)')
-          .order('sale_date', { ascending: false });
-        if (error) throw error;
-        if (!mounted) return;
-        const sales = data || [];
-
-        const summaries = aggregateWeekly(sales);
-        setRows(summaries);
-      } catch (err) {
-        console.error(err);
-      }
-    }
-    fetch();
-    return () => {
-      mounted = false;
-    };
+    setRows(summaries);
+  } catch (err) {
+    console.error(err);
+  }
+}
+fetch();
+return () => {
+  mounted = false;
+};
   }, [client]);
 
-  function exportCsv() {
-    // CSV export removed in favor of PDF export
-  }
+function exportCsv() {
+  // CSV export removed in favor of PDF export
+}
 
-  const printableRef = useRef();
+const printableRef = useRef();
 
-  async function exportPdf() {
-    if (!rows || !rows.length) return window.alert('No rows to export');
-    const ele = printableRef.current;
-    if (!ele) return window.alert('Nothing to print');
+async function exportPdf() {
+  if (!rows || !rows.length) return window.alert('No rows to export');
+  const ele = printableRef.current;
+  if (!ele) return window.alert('Nothing to print');
 
-    // Use html2canvas to render the element
-    try {
-      const canvas = await html2canvas(ele, { scale: 2, useCORS: true });
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
+  // Use html2canvas to render the element
+  try {
+    const canvas = await html2canvas(ele, { scale: 2, useCORS: true });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
-      // calculate image dimensions to fit A4 width while keeping aspect ratio
-      const imgProps = pdf.getImageProperties(imgData);
-      const imgWidth = pageWidth - 20; // 10mm margin each side
-      const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
+    // calculate image dimensions to fit A4 width while keeping aspect ratio
+    const imgProps = pdf.getImageProperties(imgData);
+    const imgWidth = pageWidth - 20; // 10mm margin each side
+    const imgHeight = (imgProps.height * imgWidth) / imgProps.width;
 
-      let position = 10;
+    let position = 10;
+    pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
+    // If content taller than page, add pages
+    let remainingHeight = imgHeight;
+    while (remainingHeight > pageHeight - 20) {
+      position = position - (pageHeight - 20);
+      pdf.addPage();
       pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-      // If content taller than page, add pages
-      let remainingHeight = imgHeight;
-      while (remainingHeight > pageHeight - 20) {
-        position = position - (pageHeight - 20);
-        pdf.addPage();
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-        remainingHeight -= (pageHeight - 20);
-      }
-
-      const fileName = `weekly-report-${new Date().toISOString().slice(0, 10)}.pdf`;
-      pdf.save(fileName);
-    } catch (err) {
-      console.error('PDF export failed', err);
-      window.alert('Failed to generate PDF');
+      remainingHeight -= (pageHeight - 20);
     }
-  }
 
-  return (
-    <Card title="Weekly Report">
-      <div style={{ marginBottom: 8 }}>
-        <button onClick={exportPdf}>Download PDF</button>
-      </div>
-      {/* Hidden printable area (styled copy of the table) */}
-      <div ref={printableRef} style={{ padding: 8, background: '#fff' }}>
-        <table className="table-list">
+    const fileName = `weekly-report-${new Date().toISOString().slice(0, 10)}.pdf`;
+    pdf.save(fileName);
+  } catch (err) {
+    console.error('PDF export failed', err);
+    window.alert('Failed to generate PDF');
+  }
+}
+
+return (
+  <Card title="Weekly Report">
+    <div style={{ marginBottom: 8 }}>
+      <button onClick={exportPdf}>Download PDF</button>
+    </div>
+    {/* Hidden printable area (styled copy of the table) */}
+    <div ref={printableRef} style={{ padding: 8, background: '#fff' }}>
+      <table className="table-list">
         <thead>
           <tr>
             <th>Week</th>
@@ -103,10 +90,10 @@ export default function WeeklyReport() {
             </tr>
           ))}
         </tbody>
-        </table>
-      </div>
-    </Card>
-  );
+      </table>
+    </div>
+  </Card>
+);
 }
 
 // Helpers: aggregate sales into weekly summaries per product

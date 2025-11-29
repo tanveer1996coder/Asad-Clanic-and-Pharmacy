@@ -25,6 +25,7 @@ import { supabase } from '../../supabaseClient';
 import { formatCurrency, formatNumber, formatPercentage, getChartColor } from '../../utils/formatters';
 import { formatDate, getExpiryStatus, getDateDaysAgo } from '../../utils/dateHelpers';
 import useSettings from '../../hooks/useSettings';
+import Papa from 'papaparse';
 
 export default function ReportsPage() {
     const { settings } = useSettings();
@@ -105,6 +106,56 @@ export default function ReportsPage() {
         });
     };
 
+    const handleExport = () => {
+        let dataToExport = [];
+        let fileName = 'report';
+
+        if (activeTab === 0) {
+            // Top Products
+            dataToExport = topProducts.map(p => ({
+                Product: p.product_name,
+                'Quantity Sold': p.total_quantity,
+                Revenue: p.total_revenue,
+                'Sales Count': p.sales_count
+            }));
+            fileName = 'top_products_report';
+        } else if (activeTab === 1) {
+            // Expiry
+            dataToExport = expiryReport.map(p => ({
+                Product: p.name,
+                'Expiry Date': p.expiry_date,
+                'Days Left': p.days_until_expiry,
+                Stock: p.stock
+            }));
+            fileName = 'expiry_report';
+        } else if (activeTab === 2) {
+            // Low Stock
+            dataToExport = lowStockReport.map(p => ({
+                Product: p.name,
+                Category: p.category,
+                Stock: p.stock,
+                'Min Level': p.min_stock_level
+            }));
+            fileName = 'low_stock_report';
+        }
+
+        if (dataToExport.length === 0) {
+            toast.info('No data to export');
+            return;
+        }
+
+        const csv = Papa.unparse(dataToExport);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${fileName}_${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <Container maxWidth="xl">
             <Typography variant="h4" fontWeight={700} color="primary" mb={3}>
@@ -142,7 +193,7 @@ export default function ReportsPage() {
                                 fullWidth
                                 variant="outlined"
                                 startIcon={<Download />}
-                                onClick={() => toast.info('Export feature coming soon!')}
+                                onClick={handleExport}
                             >
                                 Export to Excel
                             </Button>

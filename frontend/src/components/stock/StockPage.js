@@ -65,6 +65,7 @@ export default function StockPage() {
                 .from('products')
                 .select('*, suppliers(name)')
                 .eq('organization_id', orgId)
+                .is('deleted_at', null)
                 .order('name');
 
             if (error) throw error;
@@ -86,6 +87,7 @@ export default function StockPage() {
             .from('suppliers')
             .select('*')
             .eq('organization_id', orgId)
+            .is('deleted_at', null)
             .order('name');
         setSuppliers(data || []);
     }

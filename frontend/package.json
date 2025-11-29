@@ -24,7 +24,7 @@
     "zustand": "^4.4.7"
   },
   "optionalDependencies": {
-    "uuid": "^9.0.0"
+    "uuid": "^9.0.1"
   },
   "scripts": {
     "start": "react-scripts start",

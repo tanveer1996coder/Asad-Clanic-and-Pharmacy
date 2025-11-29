@@ -84,6 +84,7 @@ export default function ProductsPage() {
                 .from('products')
                 .select('*, suppliers(name)')
                 .eq('organization_id', orgId)
+                .is('deleted_at', null)
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -215,9 +216,10 @@ export default function ProductsPage() {
         if (!productToDelete) return;
 
         try {
+            // Soft delete: update deleted_at
             const { error } = await supabase
                 .from('products')
-                .delete()
+                .update({ deleted_at: new Date().toISOString() })
                 .eq('id', productToDelete);
 
             if (error) throw error;
