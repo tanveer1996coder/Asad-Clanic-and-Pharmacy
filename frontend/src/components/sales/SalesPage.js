@@ -523,14 +523,9 @@ export default function SalesPage() {
                             ) : (
                                 Object.entries(groupedSales).map(([date, daySales]) => (
                                     <Box key={date} mb={3}>
-                                        <Chip
-                                            label={formatDate(date)}
-                                            color="primary"
-                                            variant="outlined"
-                                            sx={{ mb: 1 }}
-                                        />
-                                        <TableContainer>
-                                            <Table size="small">
+                                        <Chip label={formatDate(date)} color="primary" variant="outlined" sx={{ mb: 2 }} />
+                                        <TableContainer sx={{ overflowX: 'auto' }}>
+                                            <Table sx={{ minWidth: 650 }}>
                                                 <TableHead>
                                                     <TableRow>
                                                         <TableCell>Product</TableCell>
@@ -569,9 +564,9 @@ export default function SalesPage() {
                                 ))
                             )}
                         </CardContent>
-                    </Card>
-                </Grid>
-            </Grid>
+                    </Card >
+                </Grid >
+            </Grid >
 
             <ReceiptModal
                 open={receiptModalOpen}
@@ -580,6 +575,6 @@ export default function SalesPage() {
                 items={receiptData.items}
                 settings={settings}
             />
-        </Container>
+        </Container >
     );
 }

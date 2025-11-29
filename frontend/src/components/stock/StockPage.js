@@ -172,8 +172,8 @@ export default function StockPage() {
                     <Typography variant="h6" fontWeight={600} mb={2}>
                         Current Stock Levels
                     </Typography>
-                    <TableContainer>
-                        <Table>
+                    <TableContainer sx={{ overflowX: 'auto' }}>
+                        <Table sx={{ minWidth: 800 }}>
                             <TableHead>
                                 <TableRow>
                                     <TableCell><strong>Product</strong></TableCell>

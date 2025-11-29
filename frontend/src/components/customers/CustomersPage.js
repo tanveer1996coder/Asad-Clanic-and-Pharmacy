@@ -390,45 +390,39 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
             <DialogContent>
                 {tabValue === 0 ? (
                     // History Tab
-                    loading ? (
-                        <Typography>Loading...</Typography>
-                    ) : invoices.length === 0 ? (
-                        <Typography color="text.secondary">No purchase history found.</Typography>
-                    ) : (
-                        <TableContainer>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell>Date</TableCell>
-                                        <TableCell>Invoice ID</TableCell>
-                                        <TableCell>Amount</TableCell>
-                                        <TableCell>Payment</TableCell>
-                                        <TableCell align="right">Actions</TableCell>
+                    <TableContainer sx={{ overflowX: 'auto' }}>
+                        <Table sx={{ minWidth: 700 }}>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell>Date</TableCell>
+                                    <TableCell>Invoice #</TableCell>
+                                    <TableCell>Amount</TableCell>
+                                    <TableCell>Payment</TableCell>
+                                    <TableCell align="right">Actions</TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {invoices.map((inv) => (
+                                    <TableRow key={inv.id}>
+                                        <TableCell>{new Date(inv.created_at).toLocaleDateString()}</TableCell>
+                                        <TableCell>#{inv.id.slice(0, 8)}</TableCell>
+                                        <TableCell>{settings?.currency_symbol} {inv.total_amount}</TableCell>
+                                        <TableCell sx={{ textTransform: 'capitalize' }}>{inv.payment_method}</TableCell>
+                                        <TableCell align="right">
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                startIcon={<Print />}
+                                                onClick={() => handlePrintReceipt(inv)}
+                                            >
+                                                Receipt
+                                            </Button>
+                                        </TableCell>
                                     </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {invoices.map((inv) => (
-                                        <TableRow key={inv.id}>
-                                            <TableCell>{new Date(inv.created_at).toLocaleDateString()}</TableCell>
-                                            <TableCell>#{inv.id.slice(0, 8)}</TableCell>
-                                            <TableCell>{settings?.currency_symbol} {inv.total_amount}</TableCell>
-                                            <TableCell sx={{ textTransform: 'capitalize' }}>{inv.payment_method}</TableCell>
-                                            <TableCell align="right">
-                                                <Button
-                                                    size="small"
-                                                    variant="outlined"
-                                                    startIcon={<Print />}
-                                                    onClick={() => handlePrintReceipt(inv)}
-                                                >
-                                                    Receipt
-                                                </Button>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
-                    )
+                                ))}
+                            </TableBody>
+                        </Table >
+                    </TableContainer >
                 ) : (
                     // Frequent Items Tab
                     <Box>
@@ -483,8 +477,9 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
                             </TableContainer>
                         )}
                     </Box>
-                )}
-            </DialogContent>
+                )
+                }
+            </DialogContent >
             <DialogActions>
                 <Button onClick={onClose}>Close</Button>
             </DialogActions>
@@ -496,6 +491,6 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
                 items={receiptData.items}
                 settings={settings}
             />
-        </Dialog>
+        </Dialog >
     );
 }

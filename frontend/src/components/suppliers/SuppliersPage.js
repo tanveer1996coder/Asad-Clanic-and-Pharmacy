@@ -325,42 +325,72 @@ export default function SuppliersPage() {
                     ) : suppliers.length === 0 ? (
                         <Typography align="center">No suppliers found</Typography>
                     ) : (
-                        suppliers.map((supplier) => (
-                            <Card key={supplier.id} variant="outlined" sx={{ mb: 2 }}>
-                                <CardContent>
-                                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
-                                        <Typography variant="h6" fontWeight={600}>
-                                            {supplier.name}
-                                        </Typography>
-                                        <Box>
-                                            <IconButton size="small" color="primary" onClick={() => handleOpenDialog(supplier)}>
-                                                <Edit fontSize="small" />
-                                            </IconButton>
-                                            <IconButton size="small" color="error" onClick={() => handleDeleteClick(supplier.id)}>
-                                                <Delete fontSize="small" />
-                                            </IconButton>
+                        suppliers.map((supplier) => {
+                            const primaryContact = supplier.supplier_contacts?.find(c => c.is_primary);
+                            return (
+                                <Card key={supplier.id} variant="outlined" sx={{ mb: 2 }}>
+                                    <CardContent>
+                                        <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                                            <Typography variant="h6" fontWeight={600}>
+                                                {supplier.name}
+                                            </Typography>
+                                            <Box>
+                                                <IconButton size="small" color="primary" onClick={() => handleOpenDialog(supplier)}>
+                                                    <Edit fontSize="small" />
+                                                </IconButton>
+                                                <IconButton size="small" color="error" onClick={() => handleDeleteClick(supplier.id)}>
+                                                    <Delete fontSize="small" />
+                                                </IconButton>
+                                            </Box>
                                         </Box>
-                                    </Box>
-                                    <Typography variant="body2" color="text.secondary" gutterBottom>
-                                        <strong>Contact:</strong> {getPrimaryContact(supplier)}
-                                    </Typography>
-                                    {supplier.supplier_contacts && supplier.supplier_contacts.length > 0 && (
-                                        <Chip
-                                            size="small"
-                                            label={`${supplier.supplier_contacts.length} contact${supplier.supplier_contacts.length > 1 ? 's' : ''}`}
-                                            color="primary"
-                                            variant="outlined"
-                                            sx={{ mt: 1 }}
-                                        />
-                                    )}
-                                </CardContent>
-                            </Card>
-                        ))
+
+                                        <Box mb={2}>
+                                            <Typography variant="body2" color="text.secondary" gutterBottom>
+                                                <strong>Primary Contact:</strong>
+                                            </Typography>
+                                            {primaryContact ? (
+                                                <Box display="flex" alignItems="center" gap={1} flexWrap="wrap">
+                                                    <Typography variant="body1" fontWeight={500}>
+                                                        {primaryContact.contact_name}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        ({primaryContact.phone})
+                                                    </Typography>
+                                                    {primaryContact.whatsapp_enabled && (
+                                                        <Button
+                                                            variant="contained"
+                                                            color="success"
+                                                            size="small"
+                                                            startIcon={<WhatsApp />}
+                                                            onClick={() => openWhatsApp(primaryContact.phone)}
+                                                            sx={{ ml: 1 }}
+                                                        >
+                                                            Chat
+                                                        </Button>
+                                                    )}
+                                                </Box>
+                                            ) : (
+                                                <Typography variant="body2">{supplier.phone || 'No contact info'}</Typography>
+                                            )}
+                                        </Box>
+
+                                        {supplier.supplier_contacts && supplier.supplier_contacts.length > 0 && (
+                                            <Chip
+                                                size="small"
+                                                label={`${supplier.supplier_contacts.length} Total Contacts`}
+                                                color="primary"
+                                                variant="outlined"
+                                            />
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })
                     )}
                 </Box>
             ) : (
                 <Card>
-                    <TableContainer>
+                    <TableContainer sx={{ overflowX: 'auto' }}>
                         <Table>
                             <TableHead>
                                 <TableRow>

@@ -265,14 +265,21 @@ export default function ReceiptModal({ open, onClose, invoice, items, settings }
                 </Box>
             </DialogContent>
 
-            <DialogActions sx={{ p: 2, bgcolor: '#f5f5f5', flexWrap: 'wrap', gap: 1 }}>
-                <Stack direction="row" spacing={1} flexWrap="wrap">
+            <DialogActions sx={{ p: 2, bgcolor: '#f5f5f5', flexDirection: 'column', gap: 2 }}>
+                <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center" width="100%">
                     <Button
                         variant="contained"
                         startIcon={<WhatsAppIcon />}
                         onClick={handleWhatsAppShare}
                         disabled={isGenerating}
-                        sx={{ bgcolor: '#25D366', '&:hover': { bgcolor: '#128C7E' } }}
+                        size="large"
+                        sx={{
+                            bgcolor: '#25D366',
+                            '&:hover': { bgcolor: '#128C7E' },
+                            minWidth: { xs: '140px', sm: 'auto' },
+                            fontSize: { xs: '1rem', sm: '0.875rem' },
+                            py: { xs: 1.5, sm: 1 },
+                        }}
                     >
                         WhatsApp
                     </Button>
@@ -282,6 +289,11 @@ export default function ReceiptModal({ open, onClose, invoice, items, settings }
                         startIcon={<PdfIcon />}
                         onClick={handleDownloadPDF}
                         disabled={isGenerating}
+                        size="large"
+                        sx={{
+                            minWidth: { xs: '100px', sm: 'auto' },
+                            py: { xs: 1.5, sm: 1 },
+                        }}
                     >
                         PDF
                     </Button>
@@ -291,6 +303,11 @@ export default function ReceiptModal({ open, onClose, invoice, items, settings }
                         startIcon={<ImageIcon />}
                         onClick={handleDownloadImage}
                         disabled={isGenerating}
+                        size="large"
+                        sx={{
+                            minWidth: { xs: '100px', sm: 'auto' },
+                            py: { xs: 1.5, sm: 1 },
+                        }}
                     >
                         Image
                     </Button>
@@ -299,31 +316,17 @@ export default function ReceiptModal({ open, onClose, invoice, items, settings }
                         variant="outlined"
                         startIcon={<PrintIcon />}
                         onClick={handlePrint}
+                        size="large"
+                        sx={{
+                            minWidth: { xs: '100px', sm: 'auto' },
+                            py: { xs: 1.5, sm: 1 },
+                        }}
                     >
                         Print
                     </Button>
-
-                    <Button
-                        variant="outlined"
-                        startIcon={<SmsIcon />}
-                        onClick={handleSMS}
-                    >
-                        SMS
-                    </Button>
-
-                    <Button
-                        variant="outlined"
-                        startIcon={<EmailIcon />}
-                        onClick={handleEmail}
-                        disabled={isGenerating}
-                    >
-                        Email
-                    </Button>
                 </Stack>
 
-                <Box flexGrow={1} />
-
-                <Button onClick={onClose} variant="outlined">
+                <Button onClick={onClose} variant="outlined" fullWidth size="large">
                     Close
                 </Button>
             </DialogActions>

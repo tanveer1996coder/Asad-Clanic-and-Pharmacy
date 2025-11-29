@@ -138,6 +138,8 @@ export default function DailySales() {
                     variant="contained"
                     color="secondary"
                     fullWidth
+                    size="large"
+                    sx={{ minHeight: 48, px: 3 }}
                     startIcon={<Download />}
                     onClick={handleCloseDay}
                     disabled={loading || todaySales.length === 0}
