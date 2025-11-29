@@ -34,3 +34,23 @@ export const openWhatsAppOrder = (phone, productName, currentStock, storeName) =
         alert('Supplier phone number is missing!');
     }
 };
+
+/**
+ * Opens WhatsApp with a custom message
+ * @param {string} phone - Phone number
+ * @param {string} message - Message to send
+ */
+export const openWhatsApp = (phone, message) => {
+    if (!phone) {
+        alert('Phone number is missing!');
+        return;
+    }
+
+    // Remove non-numeric characters from phone
+    const cleanPhone = phone.replace(/\D/g, '');
+    const encodedMessage = encodeURIComponent(message);
+    const url = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
+
+    window.open(url, '_blank');
+};
+

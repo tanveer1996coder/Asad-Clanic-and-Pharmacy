@@ -28,6 +28,7 @@ import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { toast } from 'react-toastify';
 import ReceiptTemplate from './ReceiptTemplate';
+import { printReceipt } from '../../utils/printReceipt';
 
 const ZOOM_LEVELS = [50, 75, 100, 125, 150, 200];
 
@@ -141,7 +142,10 @@ export default function ReceiptModal({ open, onClose, invoice, items, settings }
     };
 
     const handlePrint = () => {
-        window.print();
+        const success = printReceipt(invoice, items, settings);
+        if (!success) {
+            toast.error('Failed to open print window. Please allow popups.');
+        }
     };
 
     const handleSMS = () => {

@@ -1,18 +1,13 @@
 import { formatCurrency } from './formatters';
-import { formatDate, formatTime } from './dateHelpers';
 
-export const printReceipt = (invoice, items, settings) => {
+export const printPO = (po, items, settings) => {
     try {
         const storeName = settings?.store_name || 'Medical Store';
         const currency = settings?.currency_symbol || 'Rs';
-
-        // Calculate subtotal
-        // Calculate subtotal
-        const subtotal = items.reduce((sum, item) => {
-            const price = parseFloat(item.price_at_sale || item.products?.price || 0);
-            const quantity = parseInt(item.quantity || 0);
-            return sum + (quantity * price);
-        }, 0);
+        const poNumber = po?.po_number || 'DRAFT';
+        const orderDate = po?.order_date ? new Date(po.order_date).toLocaleDateString() : new Date().toLocaleDateString();
+        const supplierName = po?.suppliers?.name || 'N/A';
+        const supplierPhone = po?.suppliers?.phone || '';
 
         // Create receipt HTML
         const receiptHTML = `
@@ -20,7 +15,7 @@ export const printReceipt = (invoice, items, settings) => {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Receipt #${invoice.id.slice(0, 8)}</title>
+    <title>PO #${poNumber}</title>
     <style>
         @media print {
             @page {
@@ -48,7 +43,6 @@ export const printReceipt = (invoice, items, settings) => {
             padding-bottom: 10px;
         }
        
-        
         .store-name {
             font-size: 18px;
             font-weight: bold;
@@ -57,12 +51,15 @@ export const printReceipt = (invoice, items, settings) => {
         
         .receipt-title {
             font-size: 14px;
+            font-weight: bold;
             margin-bottom: 5px;
         }
         
-        .date-time, .invoice-id {
+        .info-row {
+            display: flex;
+            justify-content: space-between;
             font-size: 11px;
-            color: #333;
+            margin-bottom: 2px;
         }
         
         .items-table {
@@ -81,10 +78,11 @@ export const printReceipt = (invoice, items, settings) => {
         .items-table td {
             padding: 5px 2px;
             font-size: 10px;
+            vertical-align: top;
         }
         
         .item-name {
-            max-width: 25mm;
+            max-width: 40mm;
             word-wrap: break-word;
         }
         
@@ -96,32 +94,26 @@ export const printReceipt = (invoice, items, settings) => {
             text-align: right;
         }
         
-        .totals {
-            margin-top: 10px;
-            border-top: 1px dashed #000;
-            padding-top: 10px;
-        }
-        
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 5px 0;
-            font-size: 12px;
-        }
-        
-        .total-row.final {
-            font-weight: bold;
-            font-size: 14px;
-            border-top: 1px solid #000;
-            padding-top: 5px;
-            margin-top: 5px;
-        }
-        
         .footer {
             text-align: center;
             margin-top: 15px;
             padding-top: 10px;
             border-top: 2px dashed #000;
+            font-size: 10px;
+            color: #555;
+        }
+        
+        .branding {
+            margin-top: 10px;
+            font-size: 9px;
+            color: #888;
+            font-style: italic;
+        }
+
+        .notes {
+            margin-top: 10px;
+            border-top: 1px dashed #000;
+            padding-top: 5px;
             font-size: 11px;
         }
     </style>
@@ -129,58 +121,65 @@ export const printReceipt = (invoice, items, settings) => {
 <body>
     <div class="header">
         <div class="store-name">${storeName}</div>
-        <div class="receipt-title">SALES RECEIPT</div>
-        <div class="date-time">${formatDate(invoice.created_at)} ${formatTime(invoice.created_at)}</div>
-        <div class="invoice-id">Invoice #${invoice.id.slice(0, 8)}</div>
+        ${settings?.address ? `<div style="font-size: 10px;">${settings.address}</div>` : ''}
+        ${settings?.phone ? `<div style="font-size: 10px;">Phone: ${settings.phone}</div>` : ''}
+        <div class="receipt-title" style="margin-top: 10px;">PURCHASE ORDER</div>
     </div>
+
+    <div class="info-row">
+        <span>PO #:</span>
+        <span>${poNumber}</span>
+    </div>
+    <div class="info-row">
+        <span>Date:</span>
+        <span>${orderDate}</span>
+    </div>
+    <div class="info-row">
+        <span>Supplier:</span>
+        <span>${supplierName}</span>
+    </div>
+    ${supplierPhone ? `
+    <div class="info-row">
+        <span>Supplier Ph:</span>
+        <span>${supplierPhone}</span>
+    </div>` : ''}
     
     <table class="items-table">
         <thead>
             <tr>
                 <th>Item</th>
-                <th class="text-right">Price</th>
-                <th class="text-center">Qty</th>
-                <th class="text-right">Total</th>
+                <th class="text-right">Qty (Boxes)</th>
             </tr>
         </thead>
         <tbody>
             ${items.map(item => {
-            const unitPrice = parseFloat(item.price_at_sale || item.products?.price || 0);
-            const quantity = parseInt(item.quantity || 0);
-            const lineTotal = unitPrice * quantity;
+            // Handle both data formats safely
+            let productName = 'N/A';
+            if (item.product_name) productName = item.product_name;
+            else if (item.products?.name) productName = item.products.name;
+
+            const quantity = item.quantity_ordered || 0;
 
             return `
                 <tr>
-                    <td class="item-name">${item.products?.name || 'Item'}</td>
-                    <td class="text-right">${currency} ${unitPrice.toFixed(2)}</td>
-                    <td class="text-center">${quantity}</td>
-                    <td class="text-right">${currency} ${lineTotal.toFixed(2)}</td>
+                    <td class="item-name">${productName}</td>
+                    <td class="text-right">${quantity}</td>
                 </tr>
                 `;
         }).join('')}
         </tbody>
     </table>
     
-    <div class="totals">
-        <div class="total-row">
-            <span>Subtotal:</span>
-            <span>${formatCurrency(subtotal, currency)}</span>
-        </div>
-        ${invoice.discount > 0 ? `
-        <div class="total-row">
-            <span>Discount:</span>
-            <span>-${formatCurrency(invoice.discount, currency)}</span>
-        </div>
-        ` : ''}
-        <div class="total-row final">
-            <span>Grand Total:</span>
-            <span>${formatCurrency(invoice.total_amount, currency)}</span>
-        </div>
+    ${po.notes ? `
+    <div class="notes">
+        <strong>Notes:</strong><br/>
+        ${po.notes}
     </div>
+    ` : ''}
     
     <div class="footer">
-        ${settings?.footer_text || 'Thank you for your business!'}
-        <div class="branding" style="margin-top: 10px; font-size: 9px; color: #888; font-style: italic;">
+        ${settings?.footer_text || 'Thank you for your service!'}
+        <div class="branding">
             Receipt designed and generated by MedixFlow | +923089020131
         </div>
     </div>
@@ -201,7 +200,7 @@ export const printReceipt = (invoice, items, settings) => {
         `;
 
         // Open in new window and print
-        const printWindow = window.open('', '_blank', 'width=300,height=600');
+        const printWindow = window.open('', '_blank', 'width=400,height=600');
         if (printWindow) {
             printWindow.document.write(receiptHTML);
             printWindow.document.close();
@@ -211,7 +210,7 @@ export const printReceipt = (invoice, items, settings) => {
             return false;
         }
     } catch (error) {
-        console.error('Receipt printing failed:', error);
+        console.error('PO printing failed:', error);
         return false;
     }
 };

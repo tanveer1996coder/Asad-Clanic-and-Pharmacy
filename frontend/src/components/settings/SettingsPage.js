@@ -19,9 +19,13 @@ export default function SettingsPage() {
     const { settings, loading, updateSettings } = useSettings();
     const [formData, setFormData] = useState({
         store_name: '',
+        owner_name: '',
+        phone: '',
+        address: '',
         currency_symbol: '',
         expiry_alert_days: '',
         low_stock_threshold: '',
+        footer_text: '',
     });
     const [saving, setSaving] = useState(false);
 
@@ -29,9 +33,13 @@ export default function SettingsPage() {
         if (settings) {
             setFormData({
                 store_name: settings.store_name || '',
+                owner_name: settings.owner_name || '',
+                phone: settings.phone || '',
+                address: settings.address || '',
                 currency_symbol: settings.currency_symbol || 'PKR',
                 expiry_alert_days: settings.expiry_alert_days || '15',
                 low_stock_threshold: settings.low_stock_threshold || '10',
+                footer_text: settings.footer_text || '',
             });
         }
     }, [settings]);
@@ -87,7 +95,42 @@ export default function SettingsPage() {
                                     value={formData.store_name}
                                     onChange={handleChange}
                                     placeholder="My Medical Store"
-                                    helperText="This name will appear in the sidebar and reports"
+                                    helperText="This name will appear on receipts and reports"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Owner Name"
+                                    name="owner_name"
+                                    value={formData.owner_name}
+                                    onChange={handleChange}
+                                    placeholder="John Doe"
+                                    helperText="Owner/Manager name for receipts"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Phone Number"
+                                    name="phone"
+                                    value={formData.phone}
+                                    onChange={handleChange}
+                                    placeholder="+92 300 1234567"
+                                    helperText="Contact number for receipts"
+                                />
+                            </Grid>
+                            <Grid item xs={12}>
+                                <TextField
+                                    fullWidth
+                                    label="Complete Address"
+                                    name="address"
+                                    value={formData.address}
+                                    onChange={handleChange}
+                                    placeholder="123 Main Street, City, Country"
+                                    helperText="Full address to appear on receipts"
+                                    multiline
+                                    rows={2}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -99,6 +142,17 @@ export default function SettingsPage() {
                                     onChange={handleChange}
                                     placeholder="PKR"
                                     helperText="e.g., PKR, Rs., $"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    label="Footer Text"
+                                    name="footer_text"
+                                    value={formData.footer_text}
+                                    onChange={handleChange}
+                                    placeholder="Thank you for your business!"
+                                    helperText="Text at bottom of receipts"
                                 />
                             </Grid>
                         </Grid>

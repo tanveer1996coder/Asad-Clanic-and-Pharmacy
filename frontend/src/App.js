@@ -20,6 +20,7 @@ import CustomersPage from './components/customers/CustomersPage';
 import ReportsPage from './components/reports/ReportsPage';
 import SettingsPage from './components/settings/SettingsPage';
 import SalesHistoryPage from './components/sales/SalesHistoryPage';
+import PurchaseOrdersPage from './components/purchaseOrders/PurchaseOrdersPage';
 
 import { useEffect } from 'react';
 import { syncOfflineSales } from './utils/offlineStorage';
@@ -98,6 +99,16 @@ export default function App() {
                 <ProtectedRoute>
                   <Layout>
                     <SuppliersPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/purchase-orders"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <PurchaseOrdersPage />
                   </Layout>
                 </ProtectedRoute>
               }
