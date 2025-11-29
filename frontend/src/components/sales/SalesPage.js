@@ -29,7 +29,7 @@ import { formatDate, formatTime } from '../../utils/dateHelpers';
 import { saveOfflineSale } from '../../utils/offlineStorage';
 import useSettings from '../../hooks/useSettings';
 import DailySales from './DailySales';
-import { printReceipt } from '../../utils/printReceipt';
+import ReceiptModal from '../shared/ReceiptModal';
 
 export default function SalesPage() {
     const { settings } = useSettings();
@@ -37,6 +37,8 @@ export default function SalesPage() {
     const [customers, setCustomers] = useState([]);
     const [sales, setSales] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+    const [receiptData, setReceiptData] = useState({ invoice: null, items: [] });
 
     // Cart & Form State
     const [cart, setCart] = useState([]);
@@ -265,10 +267,9 @@ export default function SalesPage() {
 
             toast.success('Sale completed successfully!');
 
-            // Trigger print automatically
-            setTimeout(() => {
-                printReceipt(savedInvoice, savedItems, settings);
-            }, 500);
+            // Show receipt modal
+            setReceiptData({ invoice: savedInvoice, items: savedItems });
+            setReceiptModalOpen(true);
 
             setCart([]);
             setFormData(prev => ({ ...prev, discount: '0', notes: '' }));
@@ -571,6 +572,14 @@ export default function SalesPage() {
                     </Card>
                 </Grid>
             </Grid>
+
+            <ReceiptModal
+                open={receiptModalOpen}
+                onClose={() => setReceiptModalOpen(false)}
+                invoice={receiptData.invoice}
+                items={receiptData.items}
+                settings={settings}
+            />
         </Container>
     );
 }

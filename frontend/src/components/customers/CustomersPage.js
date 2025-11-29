@@ -31,7 +31,7 @@ import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
 import useSettings from '../../hooks/useSettings';
 import ConfirmDialog from '../shared/ConfirmDialog';
-import { printReceipt } from '../../utils/printReceipt';
+import ReceiptModal from '../shared/ReceiptModal';
 
 export default function CustomersPage() {
     const { settings } = useSettings();
@@ -292,6 +292,8 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
     const [loading, setLoading] = useState(false);
     const { settings } = useSettings();
     const navigate = useNavigate();
+    const [receiptModalOpen, setReceiptModalOpen] = useState(false);
+    const [receiptData, setReceiptData] = useState({ invoice: null, items: [] });
 
     useEffect(() => {
         if (open && customer) {
@@ -348,13 +350,11 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
                 return;
             }
 
-            const success = printReceipt(invoice, items, settings);
-            if (!success) {
-                toast.error('Failed to open print dialog. Please check popup blocker.');
-            }
+            setReceiptData({ invoice, items });
+            setReceiptModalOpen(true);
         } catch (error) {
-            console.error('Error printing receipt:', error);
-            toast.error('Failed to fetch invoice details');
+            console.error('Error loading receipt:', error);
+            toast.error('Failed to load invoice details');
         }
     };
 
@@ -488,6 +488,14 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
             <DialogActions>
                 <Button onClick={onClose}>Close</Button>
             </DialogActions>
+
+            <ReceiptModal
+                open={receiptModalOpen}
+                onClose={() => setReceiptModalOpen(false)}
+                invoice={receiptData.invoice}
+                items={receiptData.items}
+                settings={settings}
+            />
         </Dialog>
     );
 }
