@@ -35,7 +35,7 @@ export default function App() {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
-        <Router basename={process.env.PUBLIC_URL || '/Asad-Clanic-and-Pharmacy'}>
+        <Router basename={window.location.hostname === 'localhost' ? '' : '/Asad-Clanic-and-Pharmacy'}>
           <Routes>
             {/* Public Route */}
             <Route path="/login" element={<LoginPage />} />
