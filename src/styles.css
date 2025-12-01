@@ -1,0 +1,417 @@
+body {
+    font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    margin: 0;
+    padding: 0;
+    background: #f5f7fa;
+    color: #0f172a;
+}
+
+
+.app-root {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.app-header {
+    background: #0f172a;
+    color: #fff;
+    padding: 12px 16px;
+    font-size: 18px;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+}
+
+/* layout: header fixed, content split into two scrollable columns */
+.container {
+    display: flex;
+    gap: 16px;
+    padding: 16px;
+    flex: 1 1 auto;
+    overflow: hidden; /* children handle their own scrolling */
+}
+
+.left-col {
+    width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: auto; /* independent scrollbar */
+    padding-right: 8px;
+}
+
+.right-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    overflow: auto; /* independent scrollbar */
+    padding-left: 8px;
+}
+
+/* card and form styles */
+.card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    padding: 12px;
+}
+
+.card-header {
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.form-compact {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 6px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 6px
+}
+
+.field-label {
+    font-size: 12px;
+    color: #334155;
+    margin-bottom: 4px
+}
+
+input,
+select,
+button {
+    padding: 8px;
+    border-radius: 6px;
+    border: 1px solid #e2e8f0
+}
+
+button {
+    cursor: pointer;
+    background: #0f172a;
+    color: white;
+    border: none
+}
+
+.table-list {
+    width: 100%;
+    border-collapse: collapse
+}
+
+.table-list th,
+.table-list td {
+    border-bottom: 1px solid #eef2f7;
+    padding: 8px;
+    text-align: left
+}
+
+/* make table headers sticky within scrollable container */
+.table-list thead th {
+    position: sticky;
+    top: 0;
+    background: #fff;
+    z-index: 5;
+}
+
+/* action button style */
+.btn-link {
+    background: transparent;
+    border: none;
+    color: #ef4444;
+    cursor: pointer;
+    padding: 4px 8px;
+}
+.btn-link:hover { text-decoration: underline; }
+
+.sales-day {
+    margin-bottom: 12px;
+}
+
+/* autocomplete suggestion list */
+.suggestions-list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 38px;
+    background: #fff;
+    border: 1px solid #e6e9ef;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+    border-radius: 6px;
+    max-height: 240px;
+    overflow: auto;
+    z-index: 60;
+    padding: 0;
+    margin: 0;
+    list-style: none;
+}
+.suggestions-list li {
+    padding: 8px 10px;
+    cursor: pointer;
+}
+.suggestions-list li.active,
+.suggestions-list li:hover {
+    background: #f1f5f9;
+}
+
+.sales-day-header {
+    font-weight: 600;
+    margin: 8px 0;
+    padding: 6px 8px;
+    background: #f1f5f9;
+    border-radius: 6px;
+    color: #0f172a;
+}
+
+.warn {
+    background: #fff3cd;
+    padding: 8px;
+    border-radius: 6px;
+    margin-bottom: 8px
+}
+
+.app-footer {
+    padding: 12px;
+    text-align: center;
+    font-size: 12px;
+    color: #64748b
+}
+/* ===== Tabs at top of screen ===== */
+.tabs {
+    display: flex;
+    gap: 0;
+    background: #fff;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.tabs button {
+    flex: 1;
+    padding: 12px 0;
+    font-size: 15px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+    color: #334155;
+}
+
+.tabs button:hover {
+    background: #f1f5f9;
+}
+
+.tabs button.active {
+    background: #0f172a;
+    color: #fff;
+}
+
+/* ===== Stock table ===== */
+.table {
+    width: 100%;
+    /* full width */
+    border-collapse: collapse;
+}
+
+.table th,
+.table td {
+    border-bottom: 1px solid #eef2f7;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 14px;
+}
+
+.table thead th {
+    position: sticky;
+    top: 0;
+    background: #f9fafb;
+    z-index: 5;
+}
+
+/* keep table scrollable on small devices */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+/* Optional: make Save button prettier inside stock table */
+.table button {
+    background: #0f172a;
+    color: #fff;
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: 6px;
+}
+
+/* ===== Responsive tweaks for tabs and table ===== */
+@media (max-width: 699px) {
+    .tabs button {
+        font-size: 14px;
+        padding: 10px 0;
+    }
+
+    .table th,
+    .table td {
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+}
+/* Stock search bar */
+.stock-search {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+
+.stock-search input {
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 14px;
+    width: 260px;
+    max-width: 100%;
+}
+
+/* Make the stock table fill full width */
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.table-wide {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table-wide th,
+.table-wide td {
+    border-bottom: 1px solid #eef2f7;
+    padding: 10px 12px;
+    text-align: left;
+    font-size: 14px;
+}
+
+.table-wide thead th {
+    position: sticky;
+    top: 0;
+    background: #f9fafb;
+    z-index: 5;
+}
+
+@media (max-width: 699px) {
+    .stock-search input {
+        width: 100%;
+    }
+
+    .table-wide th,
+    .table-wide td {
+        padding: 8px 10px;
+        font-size: 13px;
+    }
+}
+/* Responsive rules (mobile-first) */
+/* Mobile: stack columns, smaller paddings, table horizontal scroll */
+@media (max-width: 699px) {
+    .container {
+        flex-direction: column;
+        padding: 8px;
+        gap: 8px;
+        /* allow page vertical scrolling so stacked sections are reachable */
+        overflow: visible;
+    }
+    .left-col, .right-col {
+        width: 100%;
+        padding: 0;
+        /* remove independent scrolling on mobile so the page scrolls naturally */
+        overflow: visible;
+        max-height: none;
+    }
+    .card {
+        padding: 10px;
+    }
+    .app-header {
+        font-size: 16px;
+        padding: 10px;
+    }
+    .table-list {
+        display: block;
+        width: 100%;
+        overflow-x: auto;
+    }
+    .table-list thead, .table-list tbody, .table-list tr { display: table; width: 100%; table-layout: fixed; }
+}
+
+/* Tablet: two columns but narrow left column, slightly larger spacing */
+@media (min-width: 700px) and (max-width: 899px) {
+    .container { padding: 12px; gap: 12px; }
+    .left-col { width: 320px; }
+    .app-header { font-size: 17px; }
+}
+
+/* Laptop and up: default layout, adjust left width on very large screens */
+@media (min-width: 900px) and (max-width: 1199px) {
+    .left-col { width: 340px; }
+}
+
+@media (min-width: 1200px) {
+    .left-col { width: 360px; }
+    .container { padding: 20px; }
+}
+
+/* very narrow mobile screens: 250px - 400px */
+@media (max-width: 400px) and (min-width: 250px) {
+    .container {
+        padding: 8px;
+        gap: 8px;
+        flex-direction: column;
+        overflow: visible; /* ensure page scroll reaches all content */
+    }
+    .left-col, .right-col {
+        width: 100%;
+        box-shadow: none;
+        padding: 6px;
+        overflow: visible; /* allow vertical page scroll to reach right column */
+        max-height: none;
+    }
+    .form-compact input[type="text"],
+    .form-compact input[type="number"],
+    .form-compact input[type="date"],
+    .form-compact select,
+    .form-compact textarea {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 10px;
+        padding: 8px;
+    }
+    .suggestions-list {
+        top: 42px;
+        max-height: 180px;
+        font-size: 14px;
+    }
+    .table-list { overflow: visible; }
+
+    /* ensure action buttons don't collapse together in narrow product list */
+    .table-list tbody tr td:last-child {
+        display: flex;
+        flex-direction: column;
+        justify-content: flex-end;
+        gap:8px; /* space between Edit and Delete */
+        align-items: center;
+    }
+    /* add spacing between price column and action buttons */
+    .table-list tbody tr td:nth-child(2) {
+        padding-right: 14px;
+    }
+        .table-list tbody tr td:last-child button{
+            padding:6px 12px;
+            width: 100%;
+            font-size: 14px;
+        }
+}
