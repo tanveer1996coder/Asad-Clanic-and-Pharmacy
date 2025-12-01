@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Container,
     Card,
@@ -29,6 +30,7 @@ import Papa from 'papaparse';
 
 export default function ReportsPage() {
     const { settings } = useSettings();
+    const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState(0);
     const [dateRange, setDateRange] = useState({
         start: getDateDaysAgo(30),
@@ -41,9 +43,22 @@ export default function ReportsPage() {
     const [lowStockReport, setLowStockReport] = useState([]);
     const [topProducts, setTopProducts] = useState([]);
 
+    // Set initial tab from URL query parameter
     useEffect(() => {
-        fetchReports();
-    }, [dateRange]);
+        const tabParam = searchParams.get('tab');
+        if (tabParam) {
+            const tabIndex = parseInt(tabParam);
+            if (tabIndex >= 0 && tabIndex <= 2) {
+                setActiveTab(tabIndex);
+            }
+        }
+    }, [searchParams]);
+
+    useEffect(() => {
+        if (settings) {
+            fetchReports();
+        }
+    }, [dateRange, settings]);
 
     async function fetchReports() {
         setLoading(true);

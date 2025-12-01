@@ -21,6 +21,7 @@ import ReportsPage from './components/reports/ReportsPage';
 import SettingsPage from './components/settings/SettingsPage';
 import SalesHistoryPage from './components/sales/SalesHistoryPage';
 import PurchaseOrdersPage from './components/purchaseOrders/PurchaseOrdersPage';
+import MedicineReferencePage from './components/medicineReference/MedicineReferencePage';
 
 import { useEffect } from 'react';
 import { syncOfflineSales } from './utils/offlineStorage';
@@ -129,6 +130,16 @@ export default function App() {
                 <ProtectedRoute>
                   <Layout>
                     <ReportsPage />
+                  </Layout>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/medicine-reference"
+              element={
+                <ProtectedRoute>
+                  <Layout>
+                    <MedicineReferencePage />
                   </Layout>
                 </ProtectedRoute>
               }

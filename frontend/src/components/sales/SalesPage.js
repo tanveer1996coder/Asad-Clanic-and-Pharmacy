@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Container,
     Card,
@@ -20,6 +21,10 @@ import {
     Chip,
     useTheme,
     useMediaQuery,
+    TablePagination,
+    ToggleButton,
+    ToggleButtonGroup,
+    CircularProgress,
 } from '@mui/material';
 import { Add, Delete, ShoppingCart } from '@mui/icons-material';
 import { toast } from 'react-toastify';
@@ -33,6 +38,7 @@ import ReceiptModal from '../shared/ReceiptModal';
 
 export default function SalesPage() {
     const { settings } = useSettings();
+    const [searchParams] = useSearchParams();
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [sales, setSales] = useState([]);
@@ -40,23 +46,45 @@ export default function SalesPage() {
     const [receiptModalOpen, setReceiptModalOpen] = useState(false);
     const [receiptData, setReceiptData] = useState({ invoice: null, items: [] });
 
+    // Pagination State
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [totalCount, setTotalCount] = useState(0);
+
     // Cart & Form State
     const [cart, setCart] = useState([]);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+
+    // Check for date parameter from URL and set initial sale_date
+    const urlDate = searchParams.get('date');
+
+    // Calculate local today date YYYY-MM-DD
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const localToday = `${year}-${month}-${day}`;
+
     const [formData, setFormData] = useState({
         quantity: '1',
         price_at_sale: '',
-        sale_date: new Date().toISOString().split('T')[0],
+        sale_date: urlDate || localToday,
         payment_method: 'cash',
         discount: '0',
-        notes: ''
+        notes: '',
+        selling_unit: 'item', // 'box' or 'item'
     });
 
     useEffect(() => {
-        fetchProducts();
         fetchCustomers();
-        fetchRecentSales();
+
+        // Listen for auth changes
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' || session) {
+                fetchCustomers();
+            }
+        });
 
         // Check for quick reorder data
         const quickReorderData = localStorage.getItem('quick_reorder');
@@ -75,15 +103,21 @@ export default function SalesPage() {
 
                 setCart(cartItems);
                 toast.success(`Loaded ${items.length} items for ${customer.name}`);
-
-                // Clear the localStorage
                 localStorage.removeItem('quick_reorder');
             } catch (error) {
                 console.error('Error loading quick reorder:', error);
                 localStorage.removeItem('quick_reorder');
             }
         }
+
+        return () => {
+            authSubscription.unsubscribe();
+        };
     }, []);
+
+    useEffect(() => {
+        fetchRecentSales();
+    }, [page, rowsPerPage]);
 
     async function fetchCustomers() {
         const { data: { session } } = await supabase.auth.getSession();
@@ -99,18 +133,42 @@ export default function SalesPage() {
         setCustomers(data || []);
     }
 
-    async function fetchProducts() {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) return;
-        const orgId = session.user.id;
+    // Server-side search for products
+    const searchProducts = async (query) => {
+        if (!query || query.length < 2) {
+            setProducts([]);
+            return;
+        }
 
-        const { data } = await supabase
-            .from('products')
-            .select('*')
-            .eq('organization_id', orgId)
-            .order('name');
-        setProducts(data || []);
-    }
+        setLoading(true);
+        try {
+            const { data, error } = await supabase
+                .rpc('search_products', {
+                    search_term: query,
+                    p_limit: 50
+                });
+
+            if (error) throw error;
+            setProducts(data || []);
+        } catch (error) {
+            console.error('Error searching products:', error);
+            // Fallback to empty if RPC fails (e.g. migration not run)
+            setProducts([]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Debounce the search
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            if (selectedProduct === null) { // Only search if not selecting a product
+                // We don't auto-search on mount anymore, only on input
+            }
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, []);
 
     async function fetchRecentSales() {
         setLoading(true);
@@ -121,24 +179,59 @@ export default function SalesPage() {
         }
         const orgId = session.user.id;
 
-        const { data } = await supabase
+        const from = page * rowsPerPage;
+        const to = from + rowsPerPage - 1;
+
+        const { data, count, error } = await supabase
             .from('sales')
-            .select('*, products(name)')
+            .select('*, products(name)', { count: 'exact' })
             .eq('organization_id', orgId)
             .is('deleted_at', null)
             .order('created_at', { ascending: false })
-            .limit(50);
-        setSales(data || []);
+            .range(from, to);
+
+        if (error) {
+            console.error('Error fetching sales:', error);
+        } else {
+            setSales(data || []);
+            setTotalCount(count || 0);
+        }
         setLoading(false);
     }
 
     const handleProductChange = (event, newValue) => {
         setSelectedProduct(newValue);
         if (newValue) {
-            setFormData({
-                ...formData,
-                price_at_sale: newValue.price.toString(),
-            });
+            // Default to 'item' unless product is only sold by box
+            const defaultUnit = newValue.selling_unit === 'box' ? 'box' : 'item';
+
+            let price = newValue.price;
+            if (defaultUnit === 'box') {
+                price = newValue.price_per_box || (newValue.price * (newValue.items_per_box || 1));
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                price_at_sale: price,
+                selling_unit: defaultUnit,
+                quantity: '1'
+            }));
+        }
+    };
+
+    const handleUnitChange = (event, newUnit) => {
+        if (newUnit !== null && selectedProduct) {
+            let price = selectedProduct.price;
+
+            if (newUnit === 'box') {
+                price = selectedProduct.price_per_box || (selectedProduct.price * (selectedProduct.items_per_box || 1));
+            }
+
+            setFormData(prev => ({
+                ...prev,
+                selling_unit: newUnit,
+                price_at_sale: price
+            }));
         }
     };
 
@@ -157,36 +250,68 @@ export default function SalesPage() {
         }
 
         const quantity = parseInt(formData.quantity);
-        const price = parseFloat(formData.price_at_sale);
+        let price = parseFloat(formData.price_at_sale);
+        let actualQuantity = quantity; // Quantity in items to deduct from stock
 
         if (quantity <= 0 || isNaN(price)) {
             toast.error('Invalid quantity or price');
             return;
         }
 
-        if (selectedProduct.stock < quantity) {
-            toast.error(`Not enough stock! Available: ${selectedProduct.stock}`);
+        // Handle box-based selling
+        if (formData.selling_unit === 'box') {
+            const itemsPerBox = selectedProduct.items_per_box || 1;
+            actualQuantity = quantity * itemsPerBox;
+
+            // Use price_per_box if available, otherwise calculate from item price
+            if (selectedProduct.price_per_box) {
+                price = parseFloat(selectedProduct.price_per_box);
+            } else {
+                price = parseFloat(selectedProduct.price) * itemsPerBox;
+            }
+        } else {
+            // Item-based selling - apply rounding rules
+            const priceDecimal = price - Math.floor(price);
+            if (priceDecimal >= 0.25) {
+                // Round up to next integer
+                price = Math.ceil(price);
+            } else {
+                // Round down
+                price = Math.floor(price);
+            }
+        }
+
+        if (selectedProduct.stock < actualQuantity) {
+            toast.error(`Not enough stock! Available: ${selectedProduct.stock} items`);
             return;
         }
 
         // Check if product already in cart
-        const existingItemIndex = cart.findIndex(item => item.product.id === selectedProduct.id);
+        const existingItemIndex = cart.findIndex(item =>
+            item.product.id === selectedProduct.id &&
+            item.selling_unit === formData.selling_unit
+        );
+
         if (existingItemIndex >= 0) {
             const newCart = [...cart];
             newCart[existingItemIndex].quantity += quantity;
+            newCart[existingItemIndex].actual_quantity += actualQuantity;
+            newCart[existingItemIndex].total = newCart[existingItemIndex].quantity * newCart[existingItemIndex].price;
             setCart(newCart);
         } else {
             setCart([...cart, {
                 product: selectedProduct,
-                quantity,
+                quantity, // Display quantity (boxes or items)
+                actual_quantity: actualQuantity, // Actual items to deduct
                 price,
-                total: quantity * price
+                total: quantity * price,
+                selling_unit: formData.selling_unit,
             }]);
         }
 
         // Reset product selection but keep date/customer
         setSelectedProduct(null);
-        setFormData(prev => ({ ...prev, quantity: '1', price_at_sale: '' }));
+        setFormData(prev => ({ ...prev, quantity: '1', price_at_sale: '', selling_unit: 'item' }));
         toast.success('Added to cart');
     };
 
@@ -235,26 +360,51 @@ export default function SalesPage() {
             if (invoiceError) throw invoiceError;
 
             // 2. Create Sales Records
-            const salesData = cart.map(item => ({
+            // 2. Create Sales Records
+            const salesDataWithUnits = cart.map(item => ({
                 invoice_id: invoice.id,
                 product_id: item.product.id,
                 quantity: item.quantity,
                 price_at_sale: item.price,
                 sale_date: formData.sale_date,
-                organization_id: session.user.id
+                organization_id: session.user.id,
+                selling_unit: item.selling_unit,
+                items_per_box: item.product.items_per_box
             }));
 
+            // Try inserting with new columns first
             const { error: salesError } = await supabase
                 .from('sales')
-                .insert(salesData);
+                .insert(salesDataWithUnits);
 
-            if (salesError) throw salesError;
+            if (salesError) {
+                // Fallback: If column doesn't exist (migration not run), insert without unit details
+                if (salesError.message?.includes('column') || salesError.code === 'PGRST204') {
+                    console.warn('Migration not run? Retrying without unit details...');
+                    const salesDataLegacy = cart.map(item => ({
+                        invoice_id: invoice.id,
+                        product_id: item.product.id,
+                        quantity: item.quantity,
+                        price_at_sale: item.price,
+                        sale_date: formData.sale_date,
+                        organization_id: session.user.id
+                    }));
 
-            // 3. Update Stock
+                    const { error: retryError } = await supabase
+                        .from('sales')
+                        .insert(salesDataLegacy);
+
+                    if (retryError) throw retryError;
+                } else {
+                    throw salesError;
+                }
+            }
+
+            // 3. Update Stock - use actual_quantity for box sales
             for (const item of cart) {
                 await supabase.rpc('decrease_stock', {
                     p_id: item.product.id,
-                    q_sold: item.quantity
+                    q_sold: item.actual_quantity || item.quantity
                 });
             }
 
@@ -309,6 +459,15 @@ export default function SalesPage() {
         return acc;
     }, {});
 
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -355,12 +514,27 @@ export default function SalesPage() {
                                                     onChange={handleProductChange}
                                                     options={products}
                                                     getOptionLabel={(option) => option.name}
+                                                    filterOptions={(x) => x}
+                                                    onInputChange={(event, newInputValue) => {
+                                                        if (event && event.type === 'change') {
+                                                            searchProducts(newInputValue);
+                                                        }
+                                                    }}
                                                     renderInput={(params) => (
                                                         <TextField
                                                             {...params}
-                                                            label="Select Product"
+                                                            label="Search Product"
                                                             required={!selectedProduct}
-                                                            placeholder="Search product..."
+                                                            placeholder="Type to search (min 2 chars)..."
+                                                            InputProps={{
+                                                                ...params.InputProps,
+                                                                endAdornment: (
+                                                                    <React.Fragment>
+                                                                        {loading ? <CircularProgress color="inherit" size={20} /> : null}
+                                                                        {params.InputProps.endAdornment}
+                                                                    </React.Fragment>
+                                                                ),
+                                                            }}
                                                         />
                                                     )}
                                                     renderOption={(props, option) => (
@@ -375,16 +549,43 @@ export default function SalesPage() {
                                                     )}
                                                 />
                                             </Grid>
+                                            {selectedProduct && (selectedProduct.selling_unit === 'both' || selectedProduct.selling_unit === 'box') && (
+                                                <Grid item xs={12}>
+                                                    <Typography variant="caption" color="text.secondary" gutterBottom>
+                                                        Selling Unit
+                                                    </Typography>
+                                                    <ToggleButtonGroup
+                                                        value={formData.selling_unit}
+                                                        exclusive
+                                                        onChange={handleUnitChange}
+                                                        fullWidth
+                                                        size="small"
+                                                        color="primary"
+                                                    >
+                                                        <ToggleButton value="item" disabled={selectedProduct.selling_unit === 'box'}>
+                                                            Item (Unit)
+                                                        </ToggleButton>
+                                                        <ToggleButton value="box" disabled={selectedProduct.selling_unit === 'item'}>
+                                                            Box ({selectedProduct.items_per_box} items)
+                                                        </ToggleButton>
+                                                    </ToggleButtonGroup>
+                                                </Grid>
+                                            )}
                                             <Grid item xs={6}>
                                                 <TextField
                                                     fullWidth
                                                     required
                                                     type="number"
-                                                    label="Quantity"
+                                                    label={formData.selling_unit === 'box' ? 'Boxes' : 'Quantity'}
                                                     name="quantity"
                                                     value={formData.quantity}
                                                     onChange={handleChange}
                                                     inputProps={{ min: 1 }}
+                                                    helperText={
+                                                        formData.selling_unit === 'box' && selectedProduct
+                                                            ? `= ${parseInt(formData.quantity || 1) * (selectedProduct.items_per_box || 1)} items`
+                                                            : ''
+                                                    }
                                                 />
                                             </Grid>
                                             <Grid item xs={6}>
@@ -415,10 +616,10 @@ export default function SalesPage() {
                                     </form>
                                 </CardContent>
                             </Card>
-                        </Grid>
+                        </Grid >
 
                         {/* Right Side: Cart & Checkout */}
-                        <Grid item xs={12} md={6}>
+                        < Grid item xs={12} md={6} >
                             <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
                                 <CardContent sx={{ flexGrow: 1 }}>
                                     <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
@@ -506,9 +707,9 @@ export default function SalesPage() {
                                     </Grid>
                                 </CardContent>
                             </Card>
-                        </Grid>
-                    </Grid>
-                </Grid>
+                        </Grid >
+                    </Grid >
+                </Grid >
 
                 <Grid item xs={12}>
                     <Card>
@@ -529,7 +730,9 @@ export default function SalesPage() {
                                                 <TableHead>
                                                     <TableRow>
                                                         <TableCell>Product</TableCell>
-                                                        <TableCell align="right">Qty</TableCell>
+                                                        <TableCell align="right">Unit</TableCell>
+                                                        <TableCell align="right">Items</TableCell>
+                                                        <TableCell align="right">Boxes</TableCell>
                                                         <TableCell align="right">Price</TableCell>
                                                         <TableCell align="right">Total</TableCell>
                                                         <TableCell align="right">Time</TableCell>
@@ -537,26 +740,42 @@ export default function SalesPage() {
                                                     </TableRow>
                                                 </TableHead>
                                                 <TableBody>
-                                                    {daySales.map((sale) => (
-                                                        <TableRow key={sale.id}>
-                                                            <TableCell>{sale.products?.name || 'Unknown'}</TableCell>
-                                                            <TableCell align="right">{formatNumber(sale.quantity)}</TableCell>
-                                                            <TableCell align="right">{formatCurrency(sale.price_at_sale, settings.currency_symbol)}</TableCell>
-                                                            <TableCell align="right">
-                                                                {formatCurrency(sale.quantity * sale.price_at_sale, settings.currency_symbol)}
-                                                            </TableCell>
-                                                            <TableCell align="right">{formatTime(sale.created_at)}</TableCell>
-                                                            <TableCell align="right">
-                                                                <IconButton
-                                                                    size="small"
-                                                                    color="error"
-                                                                    onClick={() => handleDeleteSale(sale.id)}
-                                                                >
-                                                                    <Delete fontSize="small" />
-                                                                </IconButton>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))}
+                                                    {daySales.map((sale) => {
+                                                        const isBoxSale = sale.selling_unit === 'box';
+                                                        const itemsPerBox = sale.items_per_box || 1;
+                                                        const boxes = isBoxSale ? sale.quantity : 0;
+                                                        const items = isBoxSale ? sale.quantity * itemsPerBox : sale.quantity;
+
+                                                        return (
+                                                            <TableRow key={sale.id}>
+                                                                <TableCell>{sale.products?.name || 'Unknown'}</TableCell>
+                                                                <TableCell align="right">
+                                                                    <Chip
+                                                                        label={isBoxSale ? 'Box' : 'Item'}
+                                                                        size="small"
+                                                                        color={isBoxSale ? 'secondary' : 'primary'}
+                                                                        variant="outlined"
+                                                                    />
+                                                                </TableCell>
+                                                                <TableCell align="right">{formatNumber(items)}</TableCell>
+                                                                <TableCell align="right">{boxes > 0 ? formatNumber(boxes) : '—'}</TableCell>
+                                                                <TableCell align="right">{formatCurrency(sale.price_at_sale, settings.currency_symbol)}</TableCell>
+                                                                <TableCell align="right">
+                                                                    {formatCurrency(sale.quantity * sale.price_at_sale, settings.currency_symbol)}
+                                                                </TableCell>
+                                                                <TableCell align="right">{formatTime(sale.created_at)}</TableCell>
+                                                                <TableCell align="right">
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        color="error"
+                                                                        onClick={() => handleDeleteSale(sale.id)}
+                                                                    >
+                                                                        <Delete fontSize="small" />
+                                                                    </IconButton>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
                                                 </TableBody>
                                             </Table>
                                         </TableContainer>
@@ -564,7 +783,16 @@ export default function SalesPage() {
                                 ))
                             )}
                         </CardContent>
-                    </Card >
+                        <TablePagination
+                            rowsPerPageOptions={[10, 25, 50, 100]}
+                            component="div"
+                            count={totalCount}
+                            rowsPerPage={rowsPerPage}
+                            page={page}
+                            onPageChange={handleChangePage}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
+                        />
+                    </Card>
                 </Grid >
             </Grid >
 

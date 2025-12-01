@@ -41,7 +41,7 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
             // Fetch current product details (especially selling price)
             const { data: products, error } = await supabase
                 .from('products')
-                .select('id, price, cost_price')
+                .select('id, price, cost_price, items_per_box')
                 .in('id', productIds);
 
             if (error) throw error;
@@ -63,8 +63,14 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
                     quantity_already_received: item.quantity_received,
                     quantity_remaining: item.quantity_ordered - item.quantity_received,
                     quantity_to_receive: 0,
-                    unit_price: item.unit_price || product?.cost_price || 0, // Purchasing Price
-                    selling_price: product?.price || 0, // Selling Price
+                    unit_price: item.unit_price || product?.cost_price || 0, // Purchasing Price (per item)
+                    selling_price: product?.price || 0, // Selling Price (per item)
+                    boxes_received: '',
+                    items_per_box: item.items_per_box || product?.items_per_box || 1,
+                    cost_per_box: '',
+                    total_cost: '', // User entry: Total Purchasing Cost
+                    selling_price_per_box: '', // User entry: Selling Price per Box (MRP)
+                    total_selling_price: 0, // Calculated: selling_price_per_box * boxes_received
                 };
             }));
         } catch (error) {
@@ -73,17 +79,65 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
         }
     };
 
-    const handleQuantityChange = (index, value) => {
+    const handleQuantityChange = (index, field, value) => {
         const newData = [...receivingData];
-        const maxReceivable = newData[index].quantity_remaining;
-        const qty = Math.min(parseInt(value) || 0, maxReceivable);
-        newData[index].quantity_to_receive = qty;
+
+        if (field === 'boxes_received' || field === 'items_per_box') {
+            newData[index][field] = value;
+
+            const boxes = parseFloat(newData[index].boxes_received) || 0;
+            const perBox = parseFloat(newData[index].items_per_box) || 1;
+
+            // Auto-calculate total quantity
+            if (boxes > 0) {
+                const totalQty = Math.round(boxes * perBox);
+                const maxReceivable = newData[index].quantity_remaining;
+                newData[index].quantity_to_receive = Math.min(totalQty, maxReceivable);
+            }
+        } else {
+            // Direct quantity update
+            const maxReceivable = newData[index].quantity_remaining;
+            const qty = Math.min(parseInt(value) || 0, maxReceivable);
+            newData[index].quantity_to_receive = qty;
+        }
+
         setReceivingData(newData);
     };
 
     const handlePriceChange = (index, field, value) => {
         const newData = [...receivingData];
         newData[index][field] = parseFloat(value) || 0;
+
+        const boxes = parseFloat(newData[index].boxes_received) || 0;
+        const perBox = parseFloat(newData[index].items_per_box) || 1;
+        const totalItems = boxes * perBox;
+
+        // Auto-calculate costs based on Total Cost
+        if (field === 'total_cost' || field === 'boxes_received' || field === 'items_per_box') {
+            const totalCost = parseFloat(field === 'total_cost' ? value : newData[index].total_cost) || 0;
+
+            if (boxes > 0) {
+                newData[index].cost_per_box = totalCost / boxes;
+                if (totalItems > 0) {
+                    newData[index].unit_price = totalCost / totalItems;
+                }
+            }
+        }
+
+        // Auto-calculate selling price per item based on Selling Price/Box
+        if (field === 'selling_price_per_box' || field === 'items_per_box' || field === 'boxes_received') {
+            const sellBox = parseFloat(field === 'selling_price_per_box' ? value : newData[index].selling_price_per_box) || 0;
+
+            if (perBox > 0) {
+                newData[index].selling_price = sellBox / perBox;
+            }
+
+            // Calculate Total Selling Price
+            if (boxes > 0) {
+                newData[index].total_selling_price = sellBox * boxes;
+            }
+        }
+
         setReceivingData(newData);
     };
 
@@ -142,13 +196,15 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
 
                 const newStock = (currentProduct?.stock || 0) + parseInt(item.quantity_to_receive);
 
-                // Update product stock, cost price, AND selling price
+                // Update product stock, cost price, selling price, and box details
                 const { error: updateError } = await supabase
                     .from('products')
                     .update({
                         stock: newStock,
                         cost_price: item.unit_price, // Update cost price
-                        price: item.selling_price,   // Update selling price
+                        price: item.selling_price,   // Update selling price (per item)
+                        items_per_box: item.items_per_box, // Update items per box
+                        price_per_box: item.selling_price_per_box // Update MRP/Selling Price per Box
                     })
                     .eq('id', item.product_id);
 
@@ -176,6 +232,7 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
                         received_by: session.user.id,
                         stock_receipt_id: stockReceipt.id,
                         notes,
+                        boxes_received: item.boxes_received ? parseInt(item.boxes_received) : null,
                     }]);
             }
 
@@ -207,9 +264,7 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
     };
 
     const totalToReceive = receivingData.reduce((sum, item) => sum + item.quantity_to_receive, 0);
-    const totalAmount = receivingData.reduce((sum, item) =>
-        sum + (item.quantity_to_receive * item.unit_price), 0
-    );
+    const totalAmount = receivingData.reduce((sum, item) => sum + (parseFloat(item.total_cost) || 0), 0);
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="xl" fullWidth>
@@ -241,10 +296,17 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
                                         <TableCell align="center">Ordered</TableCell>
                                         <TableCell align="center">Received</TableCell>
                                         <TableCell align="center">Remaining</TableCell>
-                                        <TableCell align="center" sx={{ bgcolor: '#e3f2fd' }}>Receive Now</TableCell>
-                                        <TableCell align="center" sx={{ bgcolor: '#e3f2fd' }}>Purchasing Price</TableCell>
-                                        <TableCell align="center" sx={{ bgcolor: '#fff3e0' }}>Selling Price</TableCell>
-                                        <TableCell align="right">Total Cost</TableCell>
+                                        <TableCell align="center" sx={{ bgcolor: '#e3f2fd' }}>Boxes Received</TableCell>
+                                        <TableCell align="center" sx={{ bgcolor: '#e3f2fd' }}>Items/Box</TableCell>
+                                        <TableCell align="center" sx={{ bgcolor: '#e3f2fd' }}>Total Cost</TableCell>
+                                        <TableCell align="center" sx={{ bgcolor: '#e3f2fd' }}>MRP/Box</TableCell>
+
+                                        {/* System Calculated Fields */}
+                                        <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>Total Items</TableCell>
+                                        <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>Cost/Box</TableCell>
+                                        <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>Cost/Item</TableCell>
+                                        <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>Sale/Item</TableCell>
+                                        <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>Total Selling</TableCell>
                                         <TableCell></TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -273,13 +335,10 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
                                                 <TextField
                                                     type="number"
                                                     size="small"
-                                                    value={item.quantity_to_receive}
-                                                    onChange={(e) => handleQuantityChange(index, e.target.value)}
-                                                    inputProps={{
-                                                        min: 0,
-                                                        max: item.quantity_remaining,
-                                                        style: { width: '70px', textAlign: 'center', fontWeight: 'bold' }
-                                                    }}
+                                                    placeholder="Boxes"
+                                                    value={item.boxes_received}
+                                                    onChange={(e) => handleQuantityChange(index, 'boxes_received', e.target.value)}
+                                                    inputProps={{ min: 0, style: { width: '60px', textAlign: 'center' } }}
                                                     disabled={item.quantity_remaining === 0}
                                                 />
                                             </TableCell>
@@ -287,33 +346,62 @@ export default function ReceiveStockDialog({ open, onClose, purchaseOrder, poIte
                                                 <TextField
                                                     type="number"
                                                     size="small"
-                                                    value={item.unit_price}
-                                                    onChange={(e) => handlePriceChange(index, 'unit_price', e.target.value)}
-                                                    placeholder="Cost"
-                                                    inputProps={{
-                                                        min: 0,
-                                                        step: 0.01,
-                                                        style: { width: '90px', textAlign: 'center' }
-                                                    }}
+                                                    placeholder="/Box"
+                                                    value={item.items_per_box}
+                                                    onChange={(e) => handleQuantityChange(index, 'items_per_box', e.target.value)}
+                                                    inputProps={{ min: 1, style: { width: '50px', textAlign: 'center' } }}
+                                                    disabled={item.quantity_remaining === 0}
                                                 />
                                             </TableCell>
-                                            <TableCell align="center" sx={{ bgcolor: '#fff8f0' }}>
+                                            <TableCell align="center" sx={{ bgcolor: '#f5faff' }}>
                                                 <TextField
                                                     type="number"
                                                     size="small"
-                                                    value={item.selling_price}
-                                                    onChange={(e) => handlePriceChange(index, 'selling_price', e.target.value)}
-                                                    placeholder="Sale"
+                                                    placeholder="Total"
+                                                    value={item.total_cost}
+                                                    onChange={(e) => handlePriceChange(index, 'total_cost', e.target.value)}
+                                                    inputProps={{ min: 0, step: 0.01, style: { width: '80px', textAlign: 'center' } }}
+                                                />
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ bgcolor: '#f5faff' }}>
+                                                <TextField
+                                                    type="number"
+                                                    size="small"
+                                                    value={item.selling_price_per_box}
+                                                    onChange={(e) => handlePriceChange(index, 'selling_price_per_box', e.target.value)}
+                                                    placeholder="MRP"
                                                     inputProps={{
                                                         min: 0,
                                                         step: 0.01,
-                                                        style: { width: '90px', textAlign: 'center' }
+                                                        style: { width: '80px', textAlign: 'center' }
                                                     }}
                                                 />
                                             </TableCell>
-                                            <TableCell align="right">
+
+                                            {/* Calculated Values */}
+                                            <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>
                                                 <Typography variant="body2" fontWeight={600}>
-                                                    Rs {(item.quantity_to_receive * item.unit_price).toFixed(2)}
+                                                    {item.quantity_to_receive}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>
+                                                <Typography variant="body2">
+                                                    {item.cost_per_box ? parseFloat(item.cost_per_box).toFixed(2) : '-'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>
+                                                <Typography variant="body2">
+                                                    {item.unit_price ? parseFloat(item.unit_price).toFixed(2) : '-'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>
+                                                <Typography variant="body2">
+                                                    {item.selling_price ? parseFloat(item.selling_price).toFixed(2) : '-'}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell align="center" sx={{ bgcolor: '#f5f5f5' }}>
+                                                <Typography variant="body2" fontWeight={600} color="success.main">
+                                                    {item.total_selling_price ? parseFloat(item.total_selling_price).toFixed(2) : '-'}
                                                 </Typography>
                                             </TableCell>
                                             <TableCell>

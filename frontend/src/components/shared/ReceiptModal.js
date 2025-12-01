@@ -101,13 +101,25 @@ export default function ReceiptModal({ open, onClose, invoice, items, settings }
 
         // Fallback: Open WhatsApp Web
         window.open(`https://wa.me/?text=${message}`, '_blank');
-        toast.info('WhatsApp opened. Please attach the downloaded receipt image manually.');
 
-        // Auto-download the image for manual attachment
-        const link = document.createElement('a');
-        link.href = imageDataUrl;
-        link.download = `receipt_${invoice.id.slice(0, 8)}.png`;
-        link.click();
+        try {
+            // Try to copy image to clipboard for easy pasting
+            const blob = await (await fetch(imageDataUrl)).blob();
+            await navigator.clipboard.write([
+                new ClipboardItem({
+                    [blob.type]: blob
+                })
+            ]);
+            toast.info('WhatsApp opened. Receipt image copied to clipboard! Just press Ctrl+V to paste.');
+        } catch (clipboardError) {
+            console.error('Clipboard write failed:', clipboardError);
+            // Fallback to download if clipboard fails
+            const link = document.createElement('a');
+            link.href = imageDataUrl;
+            link.download = `receipt_${invoice.id.slice(0, 8)}.png`;
+            link.click();
+            toast.info('WhatsApp opened. Please attach the downloaded receipt image manually.');
+        }
     };
 
     const handleDownloadPDF = async () => {

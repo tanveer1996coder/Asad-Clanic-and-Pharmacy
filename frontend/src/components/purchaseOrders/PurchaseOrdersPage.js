@@ -20,6 +20,7 @@ import {
     Tooltip,
     useTheme,
     useMediaQuery,
+    TablePagination,
 } from '@mui/material';
 import {
     Add,
@@ -47,7 +48,6 @@ export default function PurchaseOrdersPage() {
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     const [purchaseOrders, setPurchaseOrders] = useState([]);
-    const [filteredOrders, setFilteredOrders] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
 
@@ -55,6 +55,11 @@ export default function PurchaseOrdersPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [supplierFilter, setSupplierFilter] = useState('all');
+
+    // Pagination states
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [totalCount, setTotalCount] = useState(0);
 
     // Dialog states
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -69,8 +74,16 @@ export default function PurchaseOrdersPage() {
     }, []);
 
     useEffect(() => {
-        filterOrders();
-    }, [searchQuery, statusFilter, supplierFilter, purchaseOrders]);
+        const delayDebounceFn = setTimeout(() => {
+            fetchPurchaseOrders();
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchQuery, statusFilter, supplierFilter, page, rowsPerPage]);
+
+    useEffect(() => {
+        fetchSuppliers();
+    }, []);
 
     const fetchPurchaseOrders = async () => {
         setLoading(true);
@@ -78,18 +91,37 @@ export default function PurchaseOrdersPage() {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;
 
-            const { data, error } = await supabase
+            let query = supabase
                 .from('purchase_orders')
                 .select(`
                     *,
                     suppliers(name, phone, supplier_contacts(*))
-                `)
+                `, { count: 'exact' })
                 .eq('organization_id', session.user.id)
                 .is('deleted_at', null)
                 .order('created_at', { ascending: false });
 
+            // Apply filters
+            if (searchQuery) {
+                query = query.ilike('po_number', `%${searchQuery}%`);
+            }
+
+            if (statusFilter !== 'all') {
+                query = query.eq('status', statusFilter);
+            }
+
+            if (supplierFilter !== 'all') {
+                query = query.eq('supplier_id', supplierFilter);
+            }
+
+            const from = page * rowsPerPage;
+            const to = from + rowsPerPage - 1;
+
+            const { data, count, error } = await query.range(from, to);
+
             if (error) throw error;
             setPurchaseOrders(data || []);
+            setTotalCount(count || 0);
         } catch (error) {
             console.error('Error fetching POs:', error);
             toast.error('Failed to load purchase orders');
@@ -116,28 +148,13 @@ export default function PurchaseOrdersPage() {
         }
     };
 
-    const filterOrders = () => {
-        let filtered = [...purchaseOrders];
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
 
-        // Search filter
-        if (searchQuery) {
-            filtered = filtered.filter(po =>
-                po.po_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                po.suppliers?.name.toLowerCase().includes(searchQuery.toLowerCase())
-            );
-        }
-
-        // Status filter
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(po => po.status === statusFilter);
-        }
-
-        // Supplier filter
-        if (supplierFilter !== 'all') {
-            filtered = filtered.filter(po => po.supplier_id === supplierFilter);
-        }
-
-        setFilteredOrders(filtered);
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
     };
 
     const getStatusColor = (status) => {
@@ -295,7 +312,7 @@ export default function PurchaseOrdersPage() {
 
             {/* Purchase Orders Table */}
             <Card>
-                <TableContainer sx={{ overflowX: 'auto' }}>
+                <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
                     <Table sx={{ minWidth: 900 }}>
                         <TableHead>
                             <TableRow>
@@ -312,14 +329,14 @@ export default function PurchaseOrdersPage() {
                                 <TableRow>
                                     <TableCell colSpan={6} align="center">Loading...</TableCell>
                                 </TableRow>
-                            ) : filteredOrders.length === 0 ? (
+                            ) : purchaseOrders.length === 0 ? (
                                 <TableRow>
                                     <TableCell colSpan={6} align="center">
                                         No purchase orders found
                                     </TableCell>
                                 </TableRow>
                             ) : (
-                                filteredOrders.map((po) => (
+                                purchaseOrders.map((po) => (
                                     <TableRow key={po.id} hover>
                                         <TableCell>
                                             <Typography variant="body2" fontWeight={600}>
@@ -386,6 +403,16 @@ export default function PurchaseOrdersPage() {
                     </Table>
                 </TableContainer>
             </Card>
+
+            <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={totalCount}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+            />
 
             {/* Dialogs */}
             <CreateEditPODialog

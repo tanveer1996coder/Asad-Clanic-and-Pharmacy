@@ -32,6 +32,19 @@ export default function ReceiptTemplate({ invoice, items, settings }) {
         >
             {/* Header */}
             <Box textAlign="center" mb={3}>
+                {settings?.logo_url && (
+                    <Box mb={2} display="flex" justifyContent="center">
+                        <img
+                            src={settings.logo_url}
+                            alt="Store Logo"
+                            style={{
+                                maxHeight: '80px',
+                                maxWidth: '200px',
+                                objectFit: 'contain',
+                            }}
+                        />
+                    </Box>
+                )}
                 <Typography variant="h4" fontWeight={700} color="primary" gutterBottom>
                     {settings?.store_name || 'Medical Store'}
                 </Typography>
@@ -76,6 +89,7 @@ export default function ReceiptTemplate({ invoice, items, settings }) {
                     <TableRow>
                         <TableCell sx={{ fontWeight: 700, borderBottom: 2 }}>Item</TableCell>
                         <TableCell align="center" sx={{ fontWeight: 700, borderBottom: 2 }}>Qty</TableCell>
+                        <TableCell align="center" sx={{ fontWeight: 700, borderBottom: 2 }}>Unit</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, borderBottom: 2 }}>Price</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, borderBottom: 2 }}>Total</TableCell>
                     </TableRow>
@@ -89,6 +103,9 @@ export default function ReceiptTemplate({ invoice, items, settings }) {
                             <TableRow key={index}>
                                 <TableCell>{item.products?.name || item.product?.name || 'Product'}</TableCell>
                                 <TableCell align="center">{item.quantity}</TableCell>
+                                <TableCell align="center">
+                                    {item.selling_unit === 'box' ? 'Box' : 'Item'}
+                                </TableCell>
                                 <TableCell align="right">{currencySymbol} {unitPrice.toFixed(2)}</TableCell>
                                 <TableCell align="right">{currencySymbol} {lineTotal.toFixed(2)}</TableCell>
                             </TableRow>

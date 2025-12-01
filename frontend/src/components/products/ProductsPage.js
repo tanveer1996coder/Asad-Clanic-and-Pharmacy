@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
     Container,
     Card,
@@ -25,6 +26,8 @@ import {
     Tooltip,
     useTheme,
     useMediaQuery,
+    TablePagination,
+    Divider,
 } from '@mui/material';
 import {
     Add,
@@ -34,6 +37,8 @@ import {
     Warning,
     CheckCircle,
     Error as ErrorIcon,
+    Close,
+    LocalPharmacy,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
@@ -41,19 +46,27 @@ import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { formatDate, getExpiryStatus, getStockStatus } from '../../utils/dateHelpers';
 import useSettings from '../../hooks/useSettings';
 import ConfirmDialog from '../shared/ConfirmDialog';
+import MedicineSearchAutocomplete from '../shared/MedicineSearchAutocomplete';
 
 export default function ProductsPage() {
     const { settings } = useSettings();
+    const [searchParams, setSearchParams] = useSearchParams();
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [totalCount, setTotalCount] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingProduct, setEditingProduct] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [productToDelete, setProductToDelete] = useState(null);
+    const [activeFilter, setActiveFilter] = useState(null);
     const [formData, setFormData] = useState({
         name: '',
+        generic_name: '',
+        drug_type: '',
         price: '',
         cost_price: '',
         stock: '',
@@ -62,12 +75,27 @@ export default function ProductsPage() {
         supplier_id: '',
         category: '',
         barcode: '',
+        items_per_box: '1',
+        price_per_box: '',
+        selling_unit: 'item',
     });
 
     useEffect(() => {
-        fetchProducts();
         fetchSuppliers();
+        // Check for filter parameter in URL
+        const filterParam = searchParams.get('filter');
+        if (filterParam) {
+            setActiveFilter(filterParam);
+        }
     }, []);
+
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            fetchProducts();
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, page, rowsPerPage, activeFilter]);
 
     async function fetchProducts() {
         setLoading(true);
@@ -80,15 +108,59 @@ export default function ProductsPage() {
             }
             const orgId = session.user.id;
 
-            const { data, error } = await supabase
+            let query = supabase
                 .from('products')
-                .select('*, suppliers(name)')
+                .select('*, suppliers(name)', { count: 'exact' })
                 .eq('organization_id', orgId)
                 .is('deleted_at', null)
                 .order('created_at', { ascending: false });
 
+            if (searchTerm) {
+                query = query.or(`name.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%,barcode.ilike.%${searchTerm}%`);
+            }
+
+            // Apply filters based on activeFilter
+            if (activeFilter === 'lowStock') {
+                // Filter for products with stock <= min_stock_level
+                const { data: allProducts } = await supabase
+                    .from('products')
+                    .select('*')
+                    .eq('organization_id', orgId)
+                    .is('deleted_at', null);
+
+                const lowStockIds = allProducts
+                    ?.filter(p => p.stock <= (p.min_stock_level || 10))
+                    .map(p => p.id) || [];
+
+                if (lowStockIds.length > 0) {
+                    query = query.in('id', lowStockIds);
+                } else {
+                    // No low stock items, return empty
+                    setProducts([]);
+                    setTotalCount(0);
+                    setLoading(false);
+                    return;
+                }
+            } else if (activeFilter === 'nearExpiry') {
+                // Filter for products expiring within threshold days
+                const expiryThreshold = parseInt(settings.expiry_alert_days || '15');
+                const thresholdDate = new Date();
+                thresholdDate.setDate(thresholdDate.getDate() + expiryThreshold);
+                const thresholdDateStr = thresholdDate.toISOString().split('T')[0];
+
+                query = query
+                    .not('expiry_date', 'is', null)
+                    .lte('expiry_date', thresholdDateStr);
+            }
+
+            const from = page * rowsPerPage;
+            const to = from + rowsPerPage - 1;
+
+            const { data, count, error } = await query.range(from, to);
+
             if (error) throw error;
             setProducts(data || []);
+            setTotalCount(count || 0);
         } catch (error) {
             console.error('Error fetching products:', error);
             toast.error('Failed to load products');
@@ -115,6 +187,8 @@ export default function ProductsPage() {
             setEditingProduct(product);
             setFormData({
                 name: product.name || '',
+                generic_name: product.generic_name || '',
+                drug_type: product.drug_type || '',
                 price: product.price || '',
                 cost_price: product.cost_price || '',
                 stock: product.stock || '',
@@ -123,11 +197,16 @@ export default function ProductsPage() {
                 supplier_id: product.supplier_id || '',
                 category: product.category || '',
                 barcode: product.barcode || '',
+                items_per_box: product.items_per_box || '1',
+                price_per_box: product.price_per_box || '',
+                selling_unit: product.selling_unit || 'item',
             });
         } else {
             setEditingProduct(null);
             setFormData({
                 name: '',
+                generic_name: '',
+                drug_type: '',
                 price: '',
                 cost_price: '',
                 stock: '',
@@ -136,6 +215,9 @@ export default function ProductsPage() {
                 supplier_id: '',
                 category: '',
                 barcode: '',
+                items_per_box: '1',
+                price_per_box: '',
+                selling_unit: 'item',
             });
         }
         setOpenDialog(true);
@@ -144,6 +226,18 @@ export default function ProductsPage() {
     const handleCloseDialog = () => {
         setOpenDialog(false);
         setEditingProduct(null);
+    };
+
+    // Helper function to extract items per box from packaging string
+    const extractItemsPerBox = (packagingString) => {
+        if (!packagingString) return null;
+
+        // Try to match patterns like "10 tablets per strip" or "100 items per box"
+        const match = packagingString.match(/(\d+)\s*(tablets?|items?|capsules?)/i);
+        if (match) {
+            return parseInt(match[1]);
+        }
+        return null;
     };
 
     const handleChange = (e) => {
@@ -171,12 +265,17 @@ export default function ProductsPage() {
 
             const productData = {
                 name: formData.name.trim(),
+                generic_name: formData.generic_name?.trim() || null,
+                drug_type: formData.drug_type || null,
                 price: parseFloat(formData.price),
                 cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
                 stock: formData.stock ? parseInt(formData.stock) : 0,
                 min_stock_level: formData.min_stock_level ? parseInt(formData.min_stock_level) : 10,
                 expiry_date: formData.expiry_date || null,
                 supplier_id: formData.supplier_id || null,
+                items_per_box: formData.items_per_box ? parseInt(formData.items_per_box) : 1,
+                price_per_box: formData.price_per_box ? parseFloat(formData.price_per_box) : null,
+                selling_unit: formData.selling_unit || 'item',
                 category: formData.category || null,
                 barcode: formData.barcode || null,
             };
@@ -234,11 +333,17 @@ export default function ProductsPage() {
         }
     };
 
-    const filteredProducts = products.filter((product) =>
-        product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (product.category && product.category.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (product.barcode && product.barcode.includes(searchTerm))
-    );
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
+    // Removed client-side filtering as we now do it on the server
+    const filteredProducts = products;
 
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -265,6 +370,26 @@ export default function ProductsPage() {
                     Add Product
                 </Button>
             </Box>
+
+            {/* Active Filter Indicator */}
+            {activeFilter && (
+                <Box mb={2}>
+                    <Chip
+                        label={
+                            activeFilter === 'lowStock'
+                                ? 'Low Stock Filter Active'
+                                : 'Near Expiry Filter Active'
+                        }
+                        color={activeFilter === 'lowStock' ? 'warning' : 'error'}
+                        icon={<Warning />}
+                        onDelete={() => {
+                            setActiveFilter(null);
+                            setSearchParams({});
+                        }}
+                        deleteIcon={<Close />}
+                    />
+                </Box>
+            )}
 
             <Card sx={{ mb: 3 }}>
                 <CardContent>
@@ -305,6 +430,11 @@ export default function ProductsPage() {
                                                 <Typography variant="h6" fontWeight={600}>
                                                     {product.name}
                                                 </Typography>
+                                                {product.generic_name && (
+                                                    <Typography variant="caption" color="text.secondary" display="block">
+                                                        {product.generic_name}
+                                                    </Typography>
+                                                )}
                                                 {product.barcode && (
                                                     <Typography variant="caption" color="text.secondary">
                                                         {product.barcode}
@@ -330,6 +460,9 @@ export default function ProductsPage() {
                                         </Box>
 
                                         <Box display="flex" flexWrap="wrap" gap={1} mb={2}>
+                                            {product.drug_type && (
+                                                <Chip label={product.drug_type} size="small" variant="outlined" color="primary" />
+                                            )}
                                             {product.category && (
                                                 <Chip label={product.category} size="small" variant="outlined" />
                                             )}
@@ -377,7 +510,7 @@ export default function ProductsPage() {
                 </Box>
             ) : (
                 <Card>
-                    <TableContainer sx={{ overflowX: 'auto' }}>
+                    <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
                         <Table sx={{ minWidth: 800 }}>
                             <TableHead>
                                 <TableRow>
@@ -412,6 +545,11 @@ export default function ProductsPage() {
                                                     <Typography variant="body2" fontWeight={600}>
                                                         {product.name}
                                                     </Typography>
+                                                    {product.generic_name && (
+                                                        <Typography variant="caption" color="text.secondary" display="block">
+                                                            {product.generic_name}
+                                                        </Typography>
+                                                    )}
                                                     {product.barcode && (
                                                         <Typography variant="caption" color="text.secondary">
                                                             {product.barcode}
@@ -419,6 +557,9 @@ export default function ProductsPage() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
+                                                    {product.drug_type && (
+                                                        <Chip label={product.drug_type} size="small" variant="outlined" color="primary" sx={{ mr: 0.5 }} />
+                                                    )}
                                                     {product.category && (
                                                         <Chip label={product.category} size="small" variant="outlined" />
                                                     )}
@@ -491,6 +632,16 @@ export default function ProductsPage() {
                 </Card>
             )}
 
+            <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={totalCount}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+            />
+
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
                 <form onSubmit={handleSubmit}>
                     <DialogTitle>
@@ -498,6 +649,37 @@ export default function ProductsPage() {
                     </DialogTitle>
                     <DialogContent>
                         <Grid container spacing={2} sx={{ mt: 1 }}>
+                            {/* Medicine Reference Search - Only show when adding new product */}
+                            {!editingProduct && (
+                                <>
+                                    <Grid item xs={12}>
+                                        <Box display="flex" alignItems="center" gap={1} mb={1}>
+                                            <LocalPharmacy color="primary" fontSize="small" />
+                                            <Typography variant="body2" color="primary" fontWeight={600}>
+                                                Search Medicine Database (Optional)
+                                            </Typography>
+                                        </Box>
+                                        <MedicineSearchAutocomplete
+                                            onSelect={(medicine) => {
+                                                // Auto-populate fields from medicine reference
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    name: medicine.brand_name,
+                                                    category: medicine.dosage_form,
+                                                    // Try to extract items_per_box from standard_packaging
+                                                    items_per_box: extractItemsPerBox(medicine.standard_packaging) || prev.items_per_box,
+                                                }));
+                                                toast.success(`Auto-filled from ${medicine.brand_name}`);
+                                            }}
+                                            label="Search by brand or generic name"
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <Divider />
+                                    </Grid>
+                                </>
+                            )}
+
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
@@ -511,12 +693,62 @@ export default function ProductsPage() {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
+                                    label="Generic Name"
+                                    name="generic_name"
+                                    value={formData.generic_name}
+                                    onChange={handleChange}
+                                    placeholder="e.g., Acetaminophen, Ibuprofen"
+                                    helperText="Scientific/generic name of the drug"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    select
+                                    label="Drug Type"
+                                    name="drug_type"
+                                    value={formData.drug_type}
+                                    onChange={handleChange}
+                                    SelectProps={{ native: true }}
+                                >
+                                    <option value="">Select Type</option>
+                                    <option value="Tablet">Tablet</option>
+                                    <option value="Capsule">Capsule</option>
+                                    <option value="Syrup">Syrup</option>
+                                    <option value="Injection">Injection</option>
+                                    <option value="Cream">Cream</option>
+                                    <option value="Ointment">Ointment</option>
+                                    <option value="Drops">Drops</option>
+                                    <option value="Inhaler">Inhaler</option>
+                                    <option value="Powder">Powder</option>
+                                    <option value="Other">Other</option>
+                                </TextField>
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
+                                    select
                                     label="Category"
                                     name="category"
                                     value={formData.category}
                                     onChange={handleChange}
-                                    placeholder="e.g., Tablets, Syrup, Injection"
-                                />
+                                    SelectProps={{ native: true }}
+                                >
+                                    <option value="">Select Category</option>
+                                    <option value="Analgesic">Analgesic (Pain Relief)</option>
+                                    <option value="Antibiotic">Antibiotic</option>
+                                    <option value="Antacid">Antacid</option>
+                                    <option value="Antihistamine">Antihistamine (Allergy)</option>
+                                    <option value="Antiviral">Antiviral</option>
+                                    <option value="Antifungal">Antifungal</option>
+                                    <option value="Antipyretic">Antipyretic (Fever)</option>
+                                    <option value="Cardiovascular">Cardiovascular</option>
+                                    <option value="Diabetes">Diabetes</option>
+                                    <option value="Gastrointestinal">Gastrointestinal</option>
+                                    <option value="Respiratory">Respiratory</option>
+                                    <option value="Vitamin">Vitamin/Supplement</option>
+                                    <option value="Other">Other</option>
+                                </TextField>
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField
@@ -592,6 +824,54 @@ export default function ProductsPage() {
                                             {supplier.name}
                                         </MenuItem>
                                     ))}
+                                </TextField>
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Items per Box"
+                                    name="items_per_box"
+                                    value={formData.items_per_box}
+                                    onChange={handleChange}
+                                    helperText="Number of tablets/items in one box"
+                                    inputProps={{ min: 1 }}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Price per Box"
+                                    name="price_per_box"
+                                    value={formData.price_per_box}
+                                    onChange={(e) => {
+                                        handleChange(e);
+                                        // Auto-calculate price per item
+                                        if (e.target.value && formData.items_per_box) {
+                                            const pricePerItem = parseFloat(e.target.value) / parseInt(formData.items_per_box);
+                                            setFormData(prev => ({ ...prev, price: pricePerItem.toFixed(2) }));
+                                        }
+                                    }}
+                                    InputProps={{
+                                        startAdornment: <InputAdornment position="start">{settings.currency_symbol}</InputAdornment>,
+                                    }}
+                                    helperText="Auto-calculates price per item"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField
+                                    fullWidth
+                                    select
+                                    label="Selling Unit"
+                                    name="selling_unit"
+                                    value={formData.selling_unit}
+                                    onChange={handleChange}
+                                    helperText="How this product is sold"
+                                >
+                                    <MenuItem value="item">Item Only</MenuItem>
+                                    <MenuItem value="box">Box Only</MenuItem>
+                                    <MenuItem value="both">Both Box & Item</MenuItem>
                                 </TextField>
                             </Grid>
                             <Grid item xs={12}>

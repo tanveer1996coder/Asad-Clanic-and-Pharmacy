@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Container,
     Grid,
@@ -28,6 +29,7 @@ import useSettings from '../../hooks/useSettings';
 
 export default function Dashboard() {
     const { settings } = useSettings();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
         todaySales: 0,
@@ -44,7 +46,22 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchDashboardData();
-    }, []);
+    }, [settings]);
+
+    useEffect(() => {
+        // Auto-refresh when window regains focus (user returns to dashboard)
+        const handleFocus = () => {
+            if (settings) {
+                fetchDashboardData();
+            }
+        };
+
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            window.removeEventListener('focus', handleFocus);
+        };
+    }, [settings]);
 
     async function fetchDashboardData() {
         setLoading(true);
@@ -85,8 +102,11 @@ export default function Dashboard() {
         const lowStockCount = productsData?.filter(p => p.stock <= (p.min_stock_level || 10)).length || 0;
 
         // Near expiry count
-        const expiryThreshold = parseInt(settings.expiry_alert_days || '15');
-        const { data: expiryData } = await supabase.rpc('get_near_expiry_products', { days_threshold: expiryThreshold });
+        const expiryThreshold = parseInt(settings?.expiry_alert_days || '15');
+        const { data: expiryData, error: expiryError } = await supabase.rpc('get_near_expiry_products', { days_threshold: expiryThreshold });
+        if (expiryError) {
+            console.error('Error fetching near expiry products:', expiryError);
+        }
         const nearExpiryCount = expiryData?.length || 0;
 
         setStats({
@@ -118,18 +138,27 @@ export default function Dashboard() {
     }
 
     async function fetchTopProducts() {
-        const { data } = await supabase.rpc('get_top_products', { limit_count: 5, days_back: 30 });
+        const { data, error } = await supabase.rpc('get_top_products', { limit_count: 5, days_back: 30 });
+        if (error) {
+            console.error('Error fetching top products:', error);
+        }
         setTopProducts(data || []);
     }
 
     async function fetchLowStockItems() {
-        const { data } = await supabase.rpc('get_low_stock_products');
+        const { data, error } = await supabase.rpc('get_low_stock_products');
+        if (error) {
+            console.error('Error fetching low stock items:', error);
+        }
         setLowStockItems((data || []).slice(0, 5));
     }
 
     async function fetchNearExpiryItems() {
-        const expiryThreshold = parseInt(settings.expiry_alert_days || '15');
-        const { data } = await supabase.rpc('get_near_expiry_products', { days_threshold: expiryThreshold });
+        const expiryThreshold = parseInt(settings?.expiry_alert_days || '15');
+        const { data, error } = await supabase.rpc('get_near_expiry_products', { days_threshold: expiryThreshold });
+        if (error) {
+            console.error('Error fetching near expiry items:', error);
+        }
         setNearExpiryItems((data || []).slice(0, 5));
     }
 
@@ -170,6 +199,7 @@ export default function Dashboard() {
                         subtitle={formatCurrency(stats.todayRevenue, settings.currency_symbol)}
                         icon={<ShoppingCart />}
                         color="primary"
+                        onClick={() => navigate(`/sales?date=${new Date().toISOString().split('T')[0]}`)}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -179,6 +209,7 @@ export default function Dashboard() {
                         subtitle={`${formatNumber(stats.totalStock)} units in stock`}
                         icon={<Inventory />}
                         color="info"
+                        onClick={() => navigate('/products')}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -189,6 +220,7 @@ export default function Dashboard() {
                         icon={<Warning />}
                         color="warning"
                         alert={stats.lowStockCount > 0}
+                        onClick={() => navigate('/reports?tab=2')}
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
@@ -199,6 +231,7 @@ export default function Dashboard() {
                         icon={<Warning />}
                         color="error"
                         alert={stats.nearExpiryCount > 0}
+                        onClick={() => navigate('/reports?tab=1')}
                     />
                 </Grid>
             </Grid>
@@ -321,14 +354,21 @@ export default function Dashboard() {
     );
 }
 
-function StatsCard({ title, value, subtitle, icon, color, alert }) {
+function StatsCard({ title, value, subtitle, icon, color, alert, onClick }) {
     return (
         <Card
+            onClick={onClick}
             sx={{
                 background: alert
                     ? 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)'
                     : 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
                 border: alert ? '2px solid #ef4444' : 'none',
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 6,
+                },
             }}
         >
             <CardContent>

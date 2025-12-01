@@ -30,6 +30,7 @@ import {
     Settings as SettingsIcon,
     Store as StoreIcon,
     Logout as LogoutIcon,
+    LocalPharmacy as LocalPharmacyIcon,
 } from '@mui/icons-material';
 import useSettings from '../../hooks/useSettings';
 import { useAuth } from '../../contexts/AuthContext';
@@ -38,13 +39,14 @@ const drawerWidth = 260;
 
 const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Products', icon: <InventoryIcon />, path: '/products' },
     { text: 'Sales', icon: <ShoppingCartIcon />, path: '/sales' },
-    { text: 'Sales History', icon: <AssessmentIcon />, path: '/sales-history' },
+    { text: 'Products', icon: <InventoryIcon />, path: '/products' },
     { text: 'Stock', icon: <LocalShippingIcon />, path: '/stock' },
-    { text: 'Purchase Orders', icon: <ShoppingCartIcon />, path: '/purchase-orders' },
     { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
+    { text: 'Sales History', icon: <AssessmentIcon />, path: '/sales-history' },
+    { text: 'Purchase Orders', icon: <ShoppingCartIcon />, path: '/purchase-orders' },
     { text: 'Suppliers', icon: <PeopleIcon />, path: '/suppliers' },
+    { text: 'Medicine Reference', icon: <LocalPharmacyIcon />, path: '/medicine-reference' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
 ];

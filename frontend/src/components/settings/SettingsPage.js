@@ -1,17 +1,35 @@
 import React, { useState } from 'react';
 import {
     Container,
+    Typography,
+    Box,
     Card,
     CardContent,
-    Typography,
+    Grid,
     TextField,
     Button,
-    Grid,
-    Box,
     Divider,
     Alert,
+    CircularProgress,
+    Avatar,
+    Tabs,
+    Tab,
+    List,
+    ListItem,
+    ListItemIcon,
+    ListItemText,
+    Paper
 } from '@mui/material';
-import { Save } from '@mui/icons-material';
+import {
+    Save,
+    CloudUpload,
+    Delete as DeleteIcon,
+    Store,
+    SupportAgent,
+    Email,
+    Phone,
+    WhatsApp
+} from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import useSettings from '../../hooks/useSettings';
 
@@ -26,8 +44,15 @@ export default function SettingsPage() {
         expiry_alert_days: '',
         low_stock_threshold: '',
         footer_text: '',
+        logo_url: '',
     });
     const [saving, setSaving] = useState(false);
+    const [logoPreview, setLogoPreview] = useState(null);
+    const [activeTab, setActiveTab] = useState(0);
+
+    const handleTabChange = (event, newValue) => {
+        setActiveTab(newValue);
+    };
 
     React.useEffect(() => {
         if (settings) {
@@ -40,7 +65,9 @@ export default function SettingsPage() {
                 expiry_alert_days: settings.expiry_alert_days || '15',
                 low_stock_threshold: settings.low_stock_threshold || '10',
                 footer_text: settings.footer_text || '',
+                logo_url: settings.logo_url || '',
             });
+            setLogoPreview(settings.logo_url || null);
         }
     }, [settings]);
 
@@ -49,6 +76,42 @@ export default function SettingsPage() {
             ...formData,
             [e.target.name]: e.target.value,
         });
+    };
+
+    const handleLogoUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please upload an image file');
+            return;
+        }
+
+        // Validate file size (max 500KB)
+        if (file.size > 500 * 1024) {
+            toast.error('Logo file size must be less than 500KB');
+            return;
+        }
+
+        // Convert to base64
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64String = reader.result;
+            setFormData({ ...formData, logo_url: base64String });
+            setLogoPreview(base64String);
+            toast.success('Logo uploaded successfully');
+        };
+        reader.onerror = () => {
+            toast.error('Failed to read file');
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveLogo = () => {
+        setFormData({ ...formData, logo_url: '' });
+        setLogoPreview(null);
+        toast.info('Logo removed');
     };
 
     const handleSubmit = async (e) => {
@@ -68,159 +131,270 @@ export default function SettingsPage() {
 
     if (loading) {
         return (
-            <Container maxWidth="md">
-                <Typography>Loading settings...</Typography>
-            </Container>
+            <Box display="flex" justifyContent="center" alignItems="center" minHeight="60vh">
+                <CircularProgress />
+            </Box>
         );
     }
 
     return (
         <Container maxWidth="md">
-            <Typography variant="h4" fontWeight={700} color="primary" mb={3}>
+            <Typography variant="h4" fontWeight={700} color="primary" gutterBottom>
                 Settings
             </Typography>
 
-            <Card>
-                <CardContent>
-                    <form onSubmit={handleSubmit}>
-                        <Typography variant="h6" fontWeight={600} mb={2}>
-                            Store Information
-                        </Typography>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Store Name"
-                                    name="store_name"
-                                    value={formData.store_name}
-                                    onChange={handleChange}
-                                    placeholder="My Medical Store"
-                                    helperText="This name will appear on receipts and reports"
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Owner Name"
-                                    name="owner_name"
-                                    value={formData.owner_name}
-                                    onChange={handleChange}
-                                    placeholder="John Doe"
-                                    helperText="Owner/Manager name for receipts"
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Phone Number"
-                                    name="phone"
-                                    value={formData.phone}
-                                    onChange={handleChange}
-                                    placeholder="+92 300 1234567"
-                                    helperText="Contact number for receipts"
-                                />
-                            </Grid>
-                            <Grid item xs={12}>
-                                <TextField
-                                    fullWidth
-                                    label="Complete Address"
-                                    name="address"
-                                    value={formData.address}
-                                    onChange={handleChange}
-                                    placeholder="123 Main Street, City, Country"
-                                    helperText="Full address to appear on receipts"
-                                    multiline
-                                    rows={2}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Currency Symbol"
-                                    name="currency_symbol"
-                                    value={formData.currency_symbol}
-                                    onChange={handleChange}
-                                    placeholder="PKR"
-                                    helperText="e.g., PKR, Rs., $"
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    label="Footer Text"
-                                    name="footer_text"
-                                    value={formData.footer_text}
-                                    onChange={handleChange}
-                                    placeholder="Thank you for your business!"
-                                    helperText="Text at bottom of receipts"
-                                />
-                            </Grid>
-                        </Grid>
+            <Paper sx={{ mb: 3 }}>
+                <Tabs value={activeTab} onChange={handleTabChange} indicatorColor="primary" textColor="primary" variant="fullWidth">
+                    <Tab icon={<Store />} label="General" />
+                    <Tab icon={<SupportAgent />} label="Support" />
+                </Tabs>
+            </Paper>
 
-                        <Divider sx={{ my: 3 }} />
+            {/* General Settings Tab */}
+            <div role="tabpanel" hidden={activeTab !== 0}>
+                {activeTab === 0 && (
+                    <Card>
+                        <CardContent>
+                            <form onSubmit={handleSubmit}>
+                                <Grid container spacing={3}>
+                                    <Grid item xs={12}>
+                                        <Typography variant="h6" gutterBottom>
+                                            Store Information
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth
+                                            label="Store Name"
+                                            name="store_name"
+                                            value={formData.store_name}
+                                            onChange={handleChange}
+                                            required
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth
+                                            label="Owner Name"
+                                            name="owner_name"
+                                            value={formData.owner_name}
+                                            onChange={handleChange}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth
+                                            label="Phone Number"
+                                            name="phone"
+                                            value={formData.phone}
+                                            onChange={handleChange}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth
+                                            label="Address"
+                                            name="address"
+                                            value={formData.address}
+                                            onChange={handleChange}
+                                            multiline
+                                            rows={1}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth
+                                            label="Currency Symbol"
+                                            name="currency_symbol"
+                                            value={formData.currency_symbol}
+                                            onChange={handleChange}
+                                            helperText="e.g. $, Rs, €"
+                                        />
+                                    </Grid>
 
-                        <Typography variant="h6" fontWeight={600} mb={2}>
-                            Alert Settings
-                        </Typography>
-                        <Grid container spacing={3}>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Expiry Alert (Days)"
-                                    name="expiry_alert_days"
-                                    value={formData.expiry_alert_days}
-                                    onChange={handleChange}
-                                    helperText="Alert when products expire within X days"
-                                    inputProps={{ min: 1, max: 365 }}
-                                />
-                            </Grid>
-                            <Grid item xs={12} sm={6}>
-                                <TextField
-                                    fullWidth
-                                    type="number"
-                                    label="Low Stock Threshold"
-                                    name="low_stock_threshold"
-                                    value={formData.low_stock_threshold}
-                                    onChange={handleChange}
-                                    helperText="Alert when stock falls below this number"
-                                    inputProps={{ min: 0, max: 1000 }}
-                                />
-                            </Grid>
-                        </Grid>
+                                    <Grid item xs={12}>
+                                        <Divider sx={{ my: 2 }} />
+                                        <Typography variant="h6" gutterBottom>
+                                            Inventory Alerts
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth
+                                            label="Low Stock Threshold"
+                                            name="low_stock_threshold"
+                                            type="number"
+                                            value={formData.low_stock_threshold}
+                                            onChange={handleChange}
+                                            helperText="Alert when stock falls below this"
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12} sm={6}>
+                                        <TextField
+                                            fullWidth
+                                            label="Expiry Alert Days"
+                                            name="expiry_alert_days"
+                                            type="number"
+                                            value={formData.expiry_alert_days}
+                                            onChange={handleChange}
+                                            helperText="Alert days before expiry"
+                                        />
+                                    </Grid>
 
-                        <Box mt={4}>
-                            <Alert severity="info" sx={{ mb: 2 }}>
-                                Changes will take effect immediately after saving.
-                            </Alert>
-                            <Button
-                                type="submit"
-                                variant="contained"
-                                size="large"
-                                startIcon={<Save />}
-                                disabled={saving}
-                                fullWidth
-                            >
-                                {saving ? 'Saving...' : 'Save Settings'}
-                            </Button>
-                        </Box>
-                    </form>
-                </CardContent>
-            </Card>
+                                    <Grid item xs={12}>
+                                        <Divider sx={{ my: 2 }} />
+                                        <Typography variant="h6" gutterBottom>
+                                            Receipt Settings
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            fullWidth
+                                            label="Receipt Footer Text"
+                                            name="footer_text"
+                                            value={formData.footer_text}
+                                            onChange={handleChange}
+                                            helperText="Message to appear at bottom of receipts"
+                                        />
+                                    </Grid>
 
-            <Card sx={{ mt: 3 }}>
-                <CardContent>
-                    <Typography variant="h6" fontWeight={600} mb={2}>
-                        About
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" paragraph>
-                        Medical Store Management System v2.0
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                        Built with React, Material-UI, and Supabase
-                    </Typography>
-                </CardContent>
-            </Card>
+                                    {/* Logo Upload Section */}
+                                    <Grid item xs={12}>
+                                        <Divider sx={{ my: 2 }} />
+                                        <Typography variant="subtitle1" fontWeight={600} mb={2}>
+                                            Store Logo
+                                        </Typography>
+                                        <Box display="flex" alignItems="center" gap={2}>
+                                            {logoPreview && (
+                                                <Avatar
+                                                    src={logoPreview}
+                                                    alt="Store Logo"
+                                                    sx={{ width: 100, height: 100 }}
+                                                    variant="rounded"
+                                                />
+                                            )}
+                                            <Box flexGrow={1}>
+                                                <Button
+                                                    variant="outlined"
+                                                    component="label"
+                                                    startIcon={<CloudUpload />}
+                                                    fullWidth
+                                                >
+                                                    {logoPreview ? 'Change Logo' : 'Upload Logo'}
+                                                    <input
+                                                        type="file"
+                                                        hidden
+                                                        accept="image/*"
+                                                        onChange={handleLogoUpload}
+                                                    />
+                                                </Button>
+                                                {logoPreview && (
+                                                    <Button
+                                                        variant="outlined"
+                                                        color="error"
+                                                        startIcon={<DeleteIcon />}
+                                                        onClick={handleRemoveLogo}
+                                                        fullWidth
+                                                        sx={{ mt: 1 }}
+                                                    >
+                                                        Remove Logo
+                                                    </Button>
+                                                )}
+                                                <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                                                    Recommended: 200x200px, PNG or JPG, max 500KB
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Grid>
+
+                                    <Grid item xs={12}>
+                                        <Button
+                                            type="submit"
+                                            variant="contained"
+                                            size="large"
+                                            startIcon={saving ? <CircularProgress size={20} color="inherit" /> : <Save />}
+                                            disabled={saving}
+                                            fullWidth
+                                        >
+                                            {saving ? 'Saving...' : 'Save Settings'}
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </form>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+
+            {/* Support Tab */}
+            <div role="tabpanel" hidden={activeTab !== 1}>
+                {activeTab === 1 && (
+                    <Card>
+                        <CardContent>
+                            <Box textAlign="center" py={4}>
+                                <SupportAgent sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
+                                <Typography variant="h5" gutterBottom>
+                                    Need Help?
+                                </Typography>
+                                <Typography color="text.secondary" paragraph>
+                                    Our support team is available to assist you with any issues or questions.
+                                </Typography>
+
+                                <Grid container spacing={3} justifyContent="center" mt={2}>
+                                    <Grid item xs={12} md={6}>
+                                        <Card variant="outlined">
+                                            <CardContent>
+                                                <List>
+                                                    <ListItem>
+                                                        <ListItemIcon>
+                                                            <Phone color="primary" />
+                                                        </ListItemIcon>
+                                                        <ListItemText
+                                                            primary="Customer Support"
+                                                            secondary="+92 300 1234567"
+                                                        />
+                                                    </ListItem>
+                                                    <ListItem>
+                                                        <ListItemIcon>
+                                                            <Email color="primary" />
+                                                        </ListItemIcon>
+                                                        <ListItemText
+                                                            primary="Email Support"
+                                                            secondary="support@medicalstoreaudit.com"
+                                                        />
+                                                    </ListItem>
+                                                    <ListItem>
+                                                        <ListItemIcon>
+                                                            <WhatsApp color="success" />
+                                                        </ListItemIcon>
+                                                        <ListItemText
+                                                            primary="WhatsApp"
+                                                            secondary="+92 300 1234567"
+                                                        />
+                                                    </ListItem>
+                                                </List>
+                                            </CardContent>
+                                        </Card>
+                                    </Grid>
+                                </Grid>
+
+                                <Box mt={4}>
+                                    <Button
+                                        variant="contained"
+                                        color="success"
+                                        startIcon={<WhatsApp />}
+                                        href="https://wa.me/923001234567"
+                                        target="_blank"
+                                        size="large"
+                                    >
+                                        Chat on WhatsApp
+                                    </Button>
+                                </Box>
+                            </Box>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
         </Container>
     );
 }

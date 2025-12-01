@@ -22,6 +22,8 @@ import {
     VisibilityOff,
     Refresh,
     Google as GoogleIcon,
+    Email as EmailIcon,
+    VpnKey as PasswordIcon
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { useAuth } from '../../contexts/AuthContext';
@@ -66,8 +68,9 @@ const generateStrongPassword = () => {
 
 export default function LoginPage() {
     const navigate = useNavigate();
-    const { signIn, signInWithGoogle } = useAuth();
+    const { signIn, signInWithGoogle, signInWithOtp } = useAuth();
 
+    const [isOtpLogin, setIsOtpLogin] = useState(false);
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
@@ -80,8 +83,13 @@ export default function LoginPage() {
         setLoading(true);
 
         try {
-            await signIn(email, password);
-            navigate('/dashboard');
+            if (isOtpLogin) {
+                await signInWithOtp(email);
+                toast.success('Login link sent to your email!');
+            } else {
+                await signIn(email, password);
+                navigate('/dashboard');
+            }
         } catch (err) {
             setError(err.message || 'Failed to log in');
         } finally {
@@ -117,25 +125,27 @@ export default function LoginPage() {
                         autoComplete="email"
                     />
 
-                    <TextField
-                        fullWidth
-                        label="Password"
-                        type={showPassword ? 'text' : 'password'}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        margin="normal"
-                        required
-                        autoComplete="current-password"
-                        InputProps={{
-                            endAdornment: (
-                                <InputAdornment position="end">
-                                    <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
-                                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                                    </IconButton>
-                                </InputAdornment>
-                            ),
-                        }}
-                    />
+                    {!isOtpLogin && (
+                        <TextField
+                            fullWidth
+                            label="Password"
+                            type={showPassword ? 'text' : 'password'}
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            margin="normal"
+                            required
+                            autoComplete="current-password"
+                            InputProps={{
+                                endAdornment: (
+                                    <InputAdornment position="end">
+                                        <IconButton onClick={() => setShowPassword(!showPassword)} edge="end">
+                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                        </IconButton>
+                                    </InputAdornment>
+                                ),
+                            }}
+                        />
+                    )}
 
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1 }}>
                         <Button
@@ -155,7 +165,18 @@ export default function LoginPage() {
                         disabled={loading}
                         sx={{ mt: 3 }}
                     >
-                        {loading ? <CircularProgress size={24} /> : 'Login'}
+                        {loading ? <CircularProgress size={24} /> : (isOtpLogin ? 'Send Login Link' : 'Login')}
+                    </Button>
+
+                    <Button
+                        fullWidth
+                        variant="text"
+                        size="medium"
+                        onClick={() => setIsOtpLogin(!isOtpLogin)}
+                        startIcon={isOtpLogin ? <PasswordIcon /> : <EmailIcon />}
+                        sx={{ mt: 2 }}
+                    >
+                        {isOtpLogin ? 'Login with Password' : 'Login with Email OTP'}
                     </Button>
 
                     <Divider sx={{ my: 2 }}>OR</Divider>

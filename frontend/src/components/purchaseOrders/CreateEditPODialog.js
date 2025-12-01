@@ -82,6 +82,8 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
                 product_id: item.product_id,
                 product_name: item.products?.name,
                 quantity_ordered: item.quantity_ordered,
+                boxes_ordered: item.boxes_ordered || '',
+                items_per_box: item.items_per_box || 1,
             })));
         }
     };
@@ -107,6 +109,8 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
             product_id: '',
             product_name: '',
             quantity_ordered: 1,
+            boxes_ordered: '',
+            items_per_box: 1,
         }]);
     };
 
@@ -118,11 +122,26 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
         const newItems = [...items];
         newItems[index][field] = value;
 
-        // If product changed, update product name
+        // If product changed, update product name and default items_per_box
         if (field === 'product_id') {
             const product = products.find(p => p.id === value);
             if (product) {
                 newItems[index].product_name = product.name;
+                newItems[index].items_per_box = product.items_per_box || 1;
+                // Recalculate if boxes are already entered
+                if (newItems[index].boxes_ordered) {
+                    newItems[index].quantity_ordered = newItems[index].boxes_ordered * (product.items_per_box || 1);
+                }
+            }
+        }
+
+        // Auto-calculate total quantity if boxes or items_per_box change
+        if (field === 'boxes_ordered' || field === 'items_per_box') {
+            const boxes = field === 'boxes_ordered' ? value : newItems[index].boxes_ordered;
+            const perBox = field === 'items_per_box' ? value : newItems[index].items_per_box;
+
+            if (boxes && perBox) {
+                newItems[index].quantity_ordered = parseInt(boxes) * parseInt(perBox);
             }
         }
 
@@ -176,6 +195,8 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
                         purchase_order_id: purchaseOrder.id,
                         product_id: item.product_id,
                         quantity_ordered: item.quantity_ordered,
+                        boxes_ordered: item.boxes_ordered ? parseInt(item.boxes_ordered) : null,
+                        items_per_box: item.items_per_box ? parseInt(item.items_per_box) : 1,
                         unit_price: 0,
                     })));
 
@@ -215,6 +236,8 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
                         purchase_order_id: newPO.id,
                         product_id: item.product_id,
                         quantity_ordered: item.quantity_ordered,
+                        boxes_ordered: item.boxes_ordered ? parseInt(item.boxes_ordered) : null,
+                        items_per_box: item.items_per_box ? parseInt(item.items_per_box) : 1,
                         unit_price: 0,
                     })));
 
@@ -291,7 +314,9 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
                                 <TableHead>
                                     <TableRow>
                                         <TableCell><strong>Product</strong></TableCell>
-                                        <TableCell width="150"><strong>Quantity</strong></TableCell>
+                                        <TableCell width="100"><strong>Boxes</strong></TableCell>
+                                        <TableCell width="100"><strong>Items/Box</strong></TableCell>
+                                        <TableCell width="120"><strong>Total Items</strong></TableCell>
                                         <TableCell width="50"></TableCell>
                                     </TableRow>
                                 </TableHead>
@@ -317,9 +342,32 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
                                                     size="small"
                                                     fullWidth
                                                     type="number"
+                                                    placeholder="Boxes"
+                                                    value={item.boxes_ordered}
+                                                    onChange={(e) => handleItemChange(index, 'boxes_ordered', e.target.value)}
+                                                    inputProps={{ min: 1 }}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <TextField
+                                                    size="small"
+                                                    fullWidth
+                                                    type="number"
+                                                    placeholder="Per Box"
+                                                    value={item.items_per_box}
+                                                    onChange={(e) => handleItemChange(index, 'items_per_box', e.target.value)}
+                                                    inputProps={{ min: 1 }}
+                                                />
+                                            </TableCell>
+                                            <TableCell>
+                                                <TextField
+                                                    size="small"
+                                                    fullWidth
+                                                    type="number"
                                                     value={item.quantity_ordered}
                                                     onChange={(e) => handleItemChange(index, 'quantity_ordered', e.target.value)}
                                                     inputProps={{ min: 1 }}
+                                                    helperText="Total Units"
                                                 />
                                             </TableCell>
                                             <TableCell>

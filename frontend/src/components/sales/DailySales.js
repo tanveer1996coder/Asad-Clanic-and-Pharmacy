@@ -6,8 +6,9 @@ import {
     Box,
     Button,
     Divider,
+    CircularProgress,
 } from '@mui/material';
-import { ReceiptLong, Download } from '@mui/icons-material';
+import { ReceiptLong, Download, TableChart } from '@mui/icons-material';
 import { supabase } from '../../supabaseClient';
 import { formatCurrency } from '../../utils/formatters';
 import { toast } from 'react-toastify';
@@ -20,33 +21,49 @@ export default function DailySales() {
     const [todaySales, setTodaySales] = useState([]);
     const [totalAmount, setTotalAmount] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [downloading, setDownloading] = useState(false);
 
     useEffect(() => {
         fetchTodaySales();
 
+        // Listen for auth changes (in case session isn't ready on mount)
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
+            if (event === 'SIGNED_IN' || session) {
+                fetchTodaySales();
+            }
+        });
+
         // Subscribe to realtime changes
         const subscription = supabase
             .channel('public:sales')
-            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, payload => {
-                const saleDate = payload.new.sale_date || payload.new.created_at.split('T')[0];
-                const today = new Date().toISOString().split('T')[0];
-                if (saleDate === today) {
-                    fetchTodaySales();
-                }
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'sales' }, () => {
+                // Always fetch on new sale to be safe and ensure UI is in sync
+                fetchTodaySales();
             })
             .subscribe();
 
         return () => {
             subscription.unsubscribe();
+            authSubscription.unsubscribe();
         };
     }, []);
 
     async function fetchTodaySales() {
-        const today = new Date().toISOString().split('T')[0];
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const orgId = session.user.id;
+
+        // Calculate today's date in local time (YYYY-MM-DD)
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const today = `${year}-${month}-${day}`;
 
         const { data, error } = await supabase
             .from('sales')
             .select('*, products(name)')
+            .eq('organization_id', orgId)
             .eq('sale_date', today)
             .is('deleted_at', null);
 
@@ -61,12 +78,13 @@ export default function DailySales() {
         setLoading(false);
     }
 
-    const handleCloseDay = () => {
+    const handleDownloadPDF = async () => {
         if (todaySales.length === 0) {
             toast.info('No sales to report for today.');
             return;
         }
 
+        setDownloading(true);
         try {
             const doc = new jsPDF();
             const today = new Date().toLocaleDateString();
@@ -85,11 +103,12 @@ export default function DailySales() {
             doc.text(`Total Revenue: ${formatCurrency(totalAmount, currency)}`, 14, 42);
 
             // Table
-            const tableColumn = ["Time", "Product", "Qty", "Price", "Total"];
+            const tableColumn = ["Time", "Product", "Qty", "Unit", "Price", "Total"];
             const tableRows = todaySales.map(sale => [
                 new Date(sale.created_at).toLocaleTimeString(),
-                sale.products?.name || 'Unknown',
+                sale.products?.name || 'Unknown Product',
                 sale.quantity,
+                sale.selling_unit === 'box' ? 'Box' : 'Item',
                 formatCurrency(sale.price_at_sale, currency),
                 formatCurrency(sale.quantity * sale.price_at_sale, currency)
             ]);
@@ -99,18 +118,76 @@ export default function DailySales() {
                 head: [tableColumn],
                 body: tableRows,
                 startY: 50,
+                styles: { fontSize: 10 },
+                headStyles: { fillColor: [99, 102, 241] },
             });
 
             // Footer
             const finalY = (doc.lastAutoTable && doc.lastAutoTable.finalY) || 50;
+            doc.setFontSize(10);
             doc.text('_______________________', 150, finalY + 30);
-            doc.text('Signature', 150, finalY + 40);
+            doc.text('Authorized Signature', 150, finalY + 40);
 
             doc.save(`daily_sales_${today.replace(/\//g, '-')}.pdf`);
-            toast.success('Daily report downloaded!');
+            toast.success('PDF downloaded successfully!');
         } catch (error) {
             console.error('Error generating PDF:', error);
             toast.error(`Failed to generate PDF: ${error.message}`);
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    const handleDownloadCSV = () => {
+        if (todaySales.length === 0) {
+            toast.info('No sales to export for today.');
+            return;
+        }
+
+        setDownloading(true);
+        try {
+            const today = new Date().toLocaleDateString();
+            const currency = settings?.currency_symbol || '$';
+
+            // CSV Headers
+            let csvContent = "Time,Product,Quantity,Unit,Price,Total,Payment Method,Customer\n";
+
+            // CSV Rows
+            todaySales.forEach(sale => {
+                const time = new Date(sale.created_at).toLocaleTimeString();
+                const product = (sale.products?.name || 'Unknown Product').replace(/"/g, '""'); // Escape quotes
+                const qty = sale.quantity;
+                const unit = sale.selling_unit === 'box' ? 'Box' : 'Item';
+                const price = sale.price_at_sale;
+                const total = qty * price;
+                const payment = sale.payment_method || 'N/A';
+                const customer = sale.customers?.name || 'Walk-in';
+
+                csvContent += `"${time}","${product}",${qty},"${unit}",${price},${total},"${payment}","${customer}"\n`;
+            });
+
+            // Add summary rows
+            csvContent += `\n"Summary",,,,,,\n`;
+            csvContent += `"Total Transactions",${todaySales.length},,,,,\n`;
+            csvContent += `"Total Revenue",${totalAmount},,,,,\n`;
+
+            // Create and download
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `daily_sales_${today.replace(/\//g, '-')}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast.success('CSV downloaded successfully!');
+        } catch (error) {
+            console.error('Error generating CSV:', error);
+            toast.error(`Failed to generate CSV: ${error.message}`);
+        } finally {
+            setDownloading(false);
         }
     };
 
@@ -134,18 +211,39 @@ export default function DailySales() {
 
                 <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', mb: 2 }} />
 
-                <Button
-                    variant="contained"
-                    color="secondary"
-                    fullWidth
-                    size="large"
-                    sx={{ minHeight: 48, px: 3 }}
-                    startIcon={<Download />}
-                    onClick={handleCloseDay}
-                    disabled={loading || todaySales.length === 0}
-                >
-                    Close Day & Report
-                </Button>
+                <Box display="flex" gap={1}>
+                    <Button
+                        variant="contained"
+                        color="secondary"
+                        fullWidth
+                        size="large"
+                        sx={{ minHeight: 48 }}
+                        startIcon={downloading ? <CircularProgress size={20} color="inherit" /> : <Download />}
+                        onClick={handleDownloadPDF}
+                        disabled={loading || todaySales.length === 0 || downloading}
+                    >
+                        PDF
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        fullWidth
+                        size="large"
+                        sx={{
+                            minHeight: 48,
+                            borderColor: 'white',
+                            color: 'white',
+                            '&:hover': {
+                                borderColor: 'white',
+                                backgroundColor: 'rgba(255,255,255,0.1)',
+                            }
+                        }}
+                        startIcon={downloading ? <CircularProgress size={20} color="inherit" /> : <TableChart />}
+                        onClick={handleDownloadCSV}
+                        disabled={loading || todaySales.length === 0 || downloading}
+                    >
+                        CSV
+                    </Button>
+                </Box>
             </CardContent>
         </Card>
     );

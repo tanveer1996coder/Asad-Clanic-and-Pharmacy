@@ -19,7 +19,7 @@ import {
     Button,
     MenuItem,
     InputAdornment,
-    Pagination,
+    TablePagination,
 } from '@mui/material';
 import {
     Search,
@@ -37,72 +37,94 @@ import useSettings from '../../hooks/useSettings';
 export default function SalesHistoryPage() {
     const { settings } = useSettings();
     const [sales, setSales] = useState([]);
-    const [filteredSales, setFilteredSales] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [dateFilter, setDateFilter] = useState({
         start: '',
         end: '',
     });
-    const [page, setPage] = useState(1);
-    const itemsPerPage = 50;
+
+    // Pagination state
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(50);
+    const [totalCount, setTotalCount] = useState(0);
+    const [totalRevenue, setTotalRevenue] = useState(0);
+    const [totalItems, setTotalItems] = useState(0);
 
     useEffect(() => {
-        fetchAllSales();
-    }, []);
+        const delayDebounceFn = setTimeout(() => {
+            fetchAllSales();
+        }, 500);
 
-    useEffect(() => {
-        filterSales();
-    }, [sales, searchTerm, dateFilter]);
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, dateFilter, page, rowsPerPage]);
 
     async function fetchAllSales() {
         setLoading(true);
         try {
-            const { data, error } = await supabase
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+            const orgId = session.user.id;
+
+            let query = supabase
                 .from('sales')
-                .select('*, products(name, category)')
+                .select('*, products(name, category)', { count: 'exact' })
+                .eq('organization_id', orgId)
+                .is('deleted_at', null)
                 .order('created_at', { ascending: false });
 
+            // Apply date filters using created_at
+            if (dateFilter.start) {
+                const startDate = new Date(dateFilter.start);
+                startDate.setHours(0, 0, 0, 0);
+                query = query.gte('created_at', startDate.toISOString());
+            }
+            if (dateFilter.end) {
+                const endDate = new Date(dateFilter.end);
+                endDate.setHours(23, 59, 59, 999);
+                query = query.lte('created_at', endDate.toISOString());
+            }
+
+            const from = page * rowsPerPage;
+            const to = from + rowsPerPage - 1;
+
+            const { data, count, error } = await query.range(from, to);
+
             if (error) throw error;
-            setSales(data || []);
+
+            // Client-side filtering for product name/category if search term exists
+            let filteredData = data || [];
+            if (searchTerm && data) {
+                const search = searchTerm.toLowerCase();
+                filteredData = data.filter(sale =>
+                    sale.products?.name?.toLowerCase().includes(search) ||
+                    sale.products?.category?.toLowerCase().includes(search) ||
+                    sale.id.toLowerCase().includes(search)
+                );
+            }
+
+            setSales(filteredData);
+            setTotalCount(count || 0);
+
+            // Calculate totals from all matching records
+            const { data: allData } = await supabase
+                .from('sales')
+                .select('quantity, price_at_sale')
+                .eq('organization_id', orgId)
+                .is('deleted_at', null);
+
+            if (allData) {
+                const revenue = allData.reduce((sum, sale) => sum + (sale.quantity * sale.price_at_sale), 0);
+                const items = allData.reduce((sum, sale) => sum + sale.quantity, 0);
+                setTotalRevenue(revenue);
+                setTotalItems(items);
+            }
         } catch (error) {
             console.error('Error fetching sales:', error);
             toast.error('Failed to load sales history');
         } finally {
             setLoading(false);
         }
-    }
-
-    function filterSales() {
-        let filtered = [...sales];
-
-        // Search filter
-        if (searchTerm) {
-            const search = searchTerm.toLowerCase();
-            filtered = filtered.filter(sale =>
-                sale.products?.name?.toLowerCase().includes(search) ||
-                sale.products?.category?.toLowerCase().includes(search) ||
-                sale.id.toLowerCase().includes(search)
-            );
-        }
-
-        // Date filter
-        if (dateFilter.start) {
-            filtered = filtered.filter(sale => {
-                const saleDate = sale.sale_date || sale.created_at?.split('T')[0];
-                return saleDate >= dateFilter.start;
-            });
-        }
-
-        if (dateFilter.end) {
-            filtered = filtered.filter(sale => {
-                const saleDate = sale.sale_date || sale.created_at?.split('T')[0];
-                return saleDate <= dateFilter.end;
-            });
-        }
-
-        setFilteredSales(filtered);
-        setPage(1); // Reset to first page when filtering
     }
 
     function handleDateChange(e) {
@@ -115,10 +137,22 @@ export default function SalesHistoryPage() {
     function clearFilters() {
         setSearchTerm('');
         setDateFilter({ start: '', end: '' });
+        setPage(0);
     }
 
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
     function exportToCSV() {
-        const csvData = filteredSales.map(sale => ({
+        // For export, we need all filtered data, not just current page
+        // This is a limitation - for now export current page only
+        const csvData = sales.map(sale => ({
             'Sale ID': sale.id,
             'Date': formatDate(sale.sale_date || sale.created_at),
             'Time': formatTime(sale.created_at),
@@ -142,16 +176,7 @@ export default function SalesHistoryPage() {
         toast.success('Sales history exported!');
     }
 
-    // Calculate summary stats
-    const totalSales = filteredSales.length;
-    const totalRevenue = filteredSales.reduce((sum, sale) => sum + (sale.quantity * sale.price_at_sale), 0);
-    const totalItems = filteredSales.reduce((sum, sale) => sum + sale.quantity, 0);
-
-    // Pagination
-    const startIndex = (page - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    const paginatedSales = filteredSales.slice(startIndex, endIndex);
-    const totalPages = Math.ceil(filteredSales.length / itemsPerPage);
+    // Summary stats from totals calculated in fetch
 
     return (
         <Container maxWidth="xl">
@@ -172,7 +197,7 @@ export default function SalesHistoryPage() {
                         variant="outlined"
                         startIcon={<Download />}
                         onClick={exportToCSV}
-                        disabled={filteredSales.length === 0}
+                        disabled={sales.length === 0}
                     >
                         Export CSV
                     </Button>
@@ -188,7 +213,7 @@ export default function SalesHistoryPage() {
                                 Total Transactions
                             </Typography>
                             <Typography variant="h4" fontWeight={700} color="primary">
-                                {formatNumber(totalSales)}
+                                {formatNumber(totalCount)}
                             </Typography>
                         </CardContent>
                     </Card>
@@ -279,16 +304,14 @@ export default function SalesHistoryPage() {
                 <CardContent>
                     <Typography variant="h6" fontWeight={600} mb={2}>
                         All Sales Transactions
-                        {filteredSales.length !== sales.length && (
-                            <Chip
-                                label={`${filteredSales.length} of ${sales.length}`}
-                                size="small"
-                                color="primary"
-                                sx={{ ml: 2 }}
-                            />
-                        )}
+                        <Chip
+                            label={`Showing ${sales.length} of ${totalCount}`}
+                            size="small"
+                            color="primary"
+                            sx={{ ml: 2 }}
+                        />
                     </Typography>
-                    <TableContainer>
+                    <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
                         <Table>
                             <TableHead>
                                 <TableRow>
@@ -296,7 +319,9 @@ export default function SalesHistoryPage() {
                                     <TableCell><strong>Sale ID</strong></TableCell>
                                     <TableCell><strong>Product</strong></TableCell>
                                     <TableCell><strong>Category</strong></TableCell>
-                                    <TableCell align="right"><strong>Quantity</strong></TableCell>
+                                    <TableCell align="right"><strong>Unit</strong></TableCell>
+                                    <TableCell align="right"><strong>Items</strong></TableCell>
+                                    <TableCell align="right"><strong>Boxes</strong></TableCell>
                                     <TableCell align="right"><strong>Unit Price</strong></TableCell>
                                     <TableCell align="right"><strong>Total Amount</strong></TableCell>
                                 </TableRow>
@@ -304,75 +329,94 @@ export default function SalesHistoryPage() {
                             <TableBody>
                                 {loading ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} align="center">Loading...</TableCell>
+                                        <TableCell colSpan={9} align="center">Loading...</TableCell>
                                     </TableRow>
-                                ) : paginatedSales.length === 0 ? (
+                                ) : sales.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} align="center">
+                                        <TableCell colSpan={9} align="center">
                                             {sales.length === 0 ? 'No sales recorded yet' : 'No sales match your filters'}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    paginatedSales.map((sale) => (
-                                        <TableRow key={sale.id} hover>
-                                            <TableCell>
-                                                <Typography variant="body2" fontWeight={600}>
-                                                    {formatDate(sale.sale_date || sale.created_at)}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {formatTime(sale.created_at)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Tooltip title="Sale ID">
-                                                    <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
-                                                        {sale.id.substring(0, 8)}...
+                                    sales.map((sale) => {
+                                        const isBoxSale = sale.selling_unit === 'box';
+                                        const itemsPerBox = sale.items_per_box || 1;
+                                        const boxes = isBoxSale ? sale.quantity : 0;
+                                        const items = isBoxSale ? sale.quantity * itemsPerBox : sale.quantity;
+
+                                        return (
+                                            <TableRow key={sale.id} hover>
+                                                <TableCell>
+                                                    <Typography variant="body2" fontWeight={600}>
+                                                        {formatDate(sale.sale_date || sale.created_at)}
                                                     </Typography>
-                                                </Tooltip>
-                                            </TableCell>
-                                            <TableCell>
-                                                <Typography variant="body2" fontWeight={600}>
-                                                    {sale.products?.name || '—'}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell>
-                                                {sale.products?.category && (
-                                                    <Chip label={sale.products.category} size="small" variant="outlined" />
-                                                )}
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <Typography variant="body2">
-                                                    {formatNumber(sale.quantity)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <Typography variant="body2">
-                                                    {formatCurrency(sale.price_at_sale, settings.currency_symbol)}
-                                                </Typography>
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <Typography variant="body2" fontWeight={700} color="success.main">
-                                                    {formatCurrency(sale.quantity * sale.price_at_sale, settings.currency_symbol)}
-                                                </Typography>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {formatTime(sale.created_at)}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Tooltip title="Sale ID">
+                                                        <Typography variant="caption" sx={{ fontFamily: 'monospace' }}>
+                                                            {sale.id.substring(0, 8)}...
+                                                        </Typography>
+                                                    </Tooltip>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Typography variant="body2" fontWeight={600}>
+                                                        {sale.products?.name || '—'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {sale.products?.category && (
+                                                        <Chip label={sale.products.category} size="small" variant="outlined" />
+                                                    )}
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Chip
+                                                        label={isBoxSale ? 'Box' : 'Item'}
+                                                        size="small"
+                                                        color={isBoxSale ? 'secondary' : 'primary'}
+                                                        variant="outlined"
+                                                    />
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Typography variant="body2">
+                                                        {formatNumber(items)}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Typography variant="body2">
+                                                        {boxes > 0 ? formatNumber(boxes) : '—'}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Typography variant="body2">
+                                                        {formatCurrency(sale.price_at_sale, settings.currency_symbol)}
+                                                    </Typography>
+                                                </TableCell>
+                                                <TableCell align="right">
+                                                    <Typography variant="body2" fontWeight={700} color="success.main">
+                                                        {formatCurrency(sale.quantity * sale.price_at_sale, settings.currency_symbol)}
+                                                    </Typography>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })
                                 )}
                             </TableBody>
                         </Table>
                     </TableContainer>
 
                     {/* Pagination */}
-                    {totalPages > 1 && (
-                        <Box display="flex" justifyContent="center" mt={3}>
-                            <Pagination
-                                count={totalPages}
-                                page={page}
-                                onChange={(e, value) => setPage(value)}
-                                color="primary"
-                            />
-                        </Box>
-                    )}
+                    <TablePagination
+                        rowsPerPageOptions={[25, 50, 100, 200]}
+                        component="div"
+                        count={totalCount}
+                        rowsPerPage={rowsPerPage}
+                        page={page}
+                        onPageChange={handleChangePage}
+                        onRowsPerPageChange={handleChangeRowsPerPage}
+                    />
                 </CardContent>
             </Card>
         </Container>

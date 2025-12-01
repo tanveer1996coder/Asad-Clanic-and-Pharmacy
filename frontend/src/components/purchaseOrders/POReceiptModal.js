@@ -276,7 +276,7 @@ export default function POReceiptModal({ open, onClose, purchaseOrder, poItems, 
                                 <TableHead>
                                     <TableRow sx={{ bgcolor: 'grey.100' }}>
                                         <TableCell sx={{ fontWeight: 700 }}>Product</TableCell>
-                                        <TableCell align="right" sx={{ fontWeight: 700 }}>Quantity (Boxes)</TableCell>
+                                        <TableCell align="right" sx={{ fontWeight: 700 }}>Quantity</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -284,7 +284,12 @@ export default function POReceiptModal({ open, onClose, purchaseOrder, poItems, 
                                         <TableRow key={index} hover>
                                             <TableCell>{item.product_name}</TableCell>
                                             <TableCell align="right">
-                                                <strong>{item.quantity_ordered}</strong>
+                                                <strong>
+                                                    {item.boxes_ordered
+                                                        ? `${item.boxes_ordered} Boxes (${item.quantity_ordered} items)`
+                                                        : `${item.quantity_ordered} items`
+                                                    }
+                                                </strong>
                                             </TableCell>
                                         </TableRow>
                                     ))}

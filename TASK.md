@@ -1,15 +1,3 @@
-# Medical Store Audit - Development Task List
-
-## 🔴 CRITICAL PRIORITY (Do First)
-
-### [ ] 1. Implement Pagination System
-- [ ] Add server-side pagination to all data tables
-- [ ] Set default page size to 25-50 items
-- [ ] Implement page navigation controls (Previous, Next, Page numbers)
-- [ ] Add "Items per page" selector (25, 50, 100)
-- [ ] Apply pagination to:
-  - [ ] Products/Inventory page
-  - [ ] Stock receipts page
   - [ ] Suppliers page
   - [ ] Sales records page
   - [ ] Purchase orders page
@@ -20,98 +8,32 @@
 
 ---
 
-### [ ] 2. Box-based Inventory System
+### [x] 2. Box-based Inventory System
 **Context**: Pakistani pharmacies buy in boxes but sell by individual items (tablets, injections, etc.)
 
 #### Database Schema Updates
-- [ ] Add new fields to `products` table:
-  - [ ] `items_per_box` (integer) - Number of items (tablets/injections) in one box
-  - [ ] `price_per_box` (decimal) - Purchase price per box
-  - [ ] `price_per_item` (decimal, calculated) - Auto-calculated: price_per_box / items_per_box
-  - [ ] `selling_unit` (enum: 'box', 'item', 'both') - How this product is sold
-- [ ] Update `stock_receipts` table:
-  - [ ] `boxes_received` (integer) - Number of boxes received
-  - [ ] `total_items` (integer, calculated) - boxes_received × items_per_box
-- [ ] Create migration script for existing data (default: 1 item per box for legacy records)
-
-#### Frontend Updates
-- [ ] **Product Entry Form**:
-  - [ ] Add "Items per Box" field
-  - [ ] Add "Price per Box" field
-  - [ ] Auto-calculate and display "Price per Item"
-  - [ ] Add "Selling Unit" dropdown (Box/Item/Both)
-- [ ] **Stock Receipt Form**:
-  - [ ] Change "Quantity" to "Boxes Received"
-  - [ ] Display: "Total Items: X" (auto-calculated)
-  - [ ] Update stock tracking logic to use total items internally
-- [ ] **Billing/Sales Form**:
-  - [ ] If selling_unit = 'box': Allow only box quantities
-  - [ ] If selling_unit = 'item': Allow only item quantities
-  - [ ] If selling_unit = 'both': Add dropdown to select "Sell by Box" or "Sell by Item"
-  - [ ] Auto-calculate price based on selected unit
-  - [ ] Display clear labels: "3 boxes of Calpol" vs "10 tablets of Calpol"
-- [ ] **Inventory Display**:
-  - [ ] Show both: "50 boxes (500 tablets)" format
-  - [ ] Low stock alerts should work on item count, not box count
-
-#### Testing
-- [ ] Test with different box sizes (10, 20, 50, 100 items per box)
-- [ ] Test selling same medicine in both boxes and items
-- [ ] Verify stock calculations are accurate
-- [ ] Test edge cases: partial boxes, fractional items
-
-**Priority**: CRITICAL - Core business requirement for Pakistani market
-
----
-
-### [ ] 3. Make Dashboard Cards Clickable
-**Context**: Cards already exist, just need to make them actionable
-
-- [ ] **Low Stock Card**:
-  - [ ] Add onClick handler
-  - [ ] Navigate to `/inventory` page
-  - [ ] Apply filter: `quantity <= 10`
-  - [ ] Pre-populate filter UI to show active filter
-  - [ ] Add visual indicator (hover effect, cursor pointer)
-  
-- [ ] **Near Expiry Card**:
-  - [ ] Add onClick handler
-  - [ ] Navigate to `/inventory` page
-  - [ ] Apply filter: `expiry_date <= today + 15 days`
-  - [ ] Pre-populate date range filter
-  
-- [ ] **Sales Card**:
-  - [ ] Add onClick handler
-  - [ ] Navigate to `/sales` page
-  - [ ] Apply filter: `created_at = today`
-  - [ ] Show today's sales details
-  
-- [ ] **[Fourth Card - TBD]**:
-  - [ ] Identify what the fourth card shows
-  - [ ] Implement appropriate navigation
-  
-- [ ] **Mobile Optimization**:
-  - [ ] Test card click behavior on mobile devices
-  - [ ] Ensure no conflicts with swipe gestures
-  - [ ] Add tactile feedback (ripple effect)
-
-**Priority**: HIGH - Major UX improvement, especially for mobile users
-
----
-
-### [ ] 4. Fix Daily Sales Record Download
+- [x] Add new fields to `products` table:
+  - [x] `items_per_box` (integer) - Number of items (tablets/injections) in one box
+  - [x] `price_per_box` (decimal) - Purchase price per box
+  - [x] `price_per_item` (decimal, calculated) - Auto-calculated: price_per_box / items_per_box
+  - [x] `selling_unit` (enum: 'box', 'item', 'both') - How this product is sold
+### [x] 4. Fix Daily Sales Record Download <!-- id: 4 -->
 **Context**: Previously agreed feature that is currently broken
 
-- [ ] Investigate current download functionality error
-- [ ] Fix PDF generation for daily sales
-- [ ] Ensure correct data is included:
-  - [ ] Date range
-  - [ ] All transactions
-  - [ ] Total sales amount
-  - [ ] Payment methods breakdown
-- [ ] Add CSV export option as alternative
-- [ ] Test with different date ranges
-- [ ] Verify download works on mobile devices
+- [x] Investigate current download functionality error
+- [x] Fix PDF generation for daily sales
+- [x] Ensure correct data is included:
+  - [x] Date range
+  - [x] All transactions
+  - [x] Total sales amount
+  - [x] Payment methods breakdown
+- [x] Add CSV export option as alternative
+- [x] Test with different date ranges
+- [x] Verify download works on mobile devices
+- [x] Fix Today's Sales card date filtering (Timezone issue)
+- [x] Fix Today's Sales card on Sales Page (Relationship issue)
+- [x] Fix Product Search on page refresh (Auth listener)
+- [x] Fix Checkout failure (Fallback for missing columns)
 
 **Priority**: HIGH - Core business functionality
 
@@ -119,7 +41,7 @@
 
 ## 🟡 HIGH PRIORITY (Do Soon)
 
-### [ ] 5. Medicine Reference Database
+### [/] 5. Medicine Reference Database <!-- id: 5 -->
 **Context**: Separate from inventory - master list of medicines in Pakistan
 
 #### Database Schema
@@ -191,23 +113,6 @@
 - [ ] Import to `medicine_reference` table
 
 **Priority**: HIGH - Depends on Phase 1 research results
-
----
-
-### [ ] 7. Sales Receipt Generation
-**Context**: Previously agreed feature
-
-- [ ] Add "Generate Receipt" button on sales page
-- [ ] Design receipt template:
-  - [ ] Store/pharmacy name and address
-  - [ ] Date and time of sale
-  - [ ] Receipt number
-  - [ ] List of items with quantities and prices
-  - [ ] Subtotal, tax (if applicable), total
-  - [ ] Payment method
-  - [ ] Footer with thank you message
-- [ ] Implement PDF generation
-- [ ] Add "Print Receipt" option
 - [ ] Add "WhatsApp Receipt" option (image format)
 - [ ] Test thermal printer compatibility (common in Pakistan)
 
@@ -216,30 +121,6 @@
 ---
 
 ### [ ] 8. Performance Optimization
-**Context**: Improve app loading speed
-
-#### Audit Current Performance
-- [ ] Run Lighthouse audit on production build
-- [ ] Identify bottlenecks:
-  - [ ] Bundle size
-  - [ ] Database query performance
-  - [ ] API response times
-  - [ ] Image optimization
-
-#### Optimizations
-- [ ] **Frontend**:
-  - [ ] Implement code splitting
-  - [ ] Lazy load components
-  - [ ] Optimize images (WebP format)
-  - [ ] Enable service worker for caching
-  - [ ] Minimize bundle size
-- [ ] **Backend/Database**:
-  - [ ] Add database indexes for frequently queried fields
-  - [ ] Optimize Supabase RLS policies
-  - [ ] Implement query result caching
-  - [ ] Use database connection pooling
-- [ ] **Targeted Load Time**: Under 3 seconds on 3G connection
-
 **Priority**: HIGH - User retention depends on performance
 
 ---
@@ -292,17 +173,6 @@
 - [ ] Create `user_devices` table:
   - [ ] `user_id`, `device_id`, `device_name`, `last_login`, `is_active`
 - [ ] On login:
-  - [ ] Generate unique device fingerprint
-  - [ ] Check if device is authorized
-  - [ ] If new device:
-    - [ ] Send verification code to email
-    - [ ] Code expires in 15 minutes
-    - [ ] Upon verification, deactivate old device
-    - [ ] Send security alert to email: "New device logged in"
-- [ ] User can manage devices in settings
-- [ ] Admin can override device restrictions
-
-#### Security Alerts
 - [ ] Email notifications for:
   - [ ] New device login
   - [ ] Password change

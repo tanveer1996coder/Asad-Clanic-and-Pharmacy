@@ -133,11 +133,32 @@ export const AuthProvider = ({ children }) => {
         return data;
     };
 
+    const signInWithOtp = async (email) => {
+        if (!supabase) throw new Error('Supabase not configured');
+
+        const { data, error } = await supabase.auth.signInWithOtp({
+            email,
+            options: {
+                emailRedirectTo: window.location.origin + '/dashboard',
+            },
+        });
+
+        if (error) throw error;
+        return data;
+    };
+
     const signOut = async () => {
         if (!supabase) throw new Error('Supabase not configured');
 
-        const { error } = await supabase.auth.signOut();
-        if (error) throw error;
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+        } finally {
+            // Force clear state to ensure UI updates immediately
+            setUser(null);
+            setSession(null);
+            setLoading(false);
+        }
     };
 
     const resetPassword = async (email) => {
@@ -168,6 +189,7 @@ export const AuthProvider = ({ children }) => {
         loading,
         signUp,
         signIn,
+        signInWithOtp,
         signInWithGoogle,
         signOut,
         resetPassword,

@@ -29,8 +29,10 @@ import {
     Divider,
     FormControlLabel,
     Checkbox,
+    InputAdornment,
+    TablePagination,
 } from '@mui/material';
-import { Add, Edit, Delete, WhatsApp, Star, StarBorder } from '@mui/icons-material';
+import { Add, Edit, Delete, WhatsApp, Star, StarBorder, Search } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
 import useSettings from '../../hooks/useSettings';
@@ -40,6 +42,10 @@ export default function SuppliersPage() {
     const { settings } = useSettings();
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [totalCount, setTotalCount] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingSupplier, setEditingSupplier] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -68,18 +74,28 @@ export default function SuppliersPage() {
             }
             const orgId = session.user.id;
 
-            const { data, error } = await supabase
+            let query = supabase
                 .from('suppliers')
                 .select(`
                     *,
                     supplier_contacts(id, contact_name, phone, whatsapp_enabled, is_primary)
-                `)
+                `, { count: 'exact' })
                 .eq('organization_id', orgId)
                 .is('deleted_at', null)
                 .order('name');
 
+            if (searchTerm) {
+                query = query.or(`name.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+            }
+
+            const from = page * rowsPerPage;
+            const to = from + rowsPerPage - 1;
+
+            const { data, count, error } = await query.range(from, to);
+
             if (error) throw error;
             setSuppliers(data || []);
+            setTotalCount(count || 0);
         } catch (err) {
             console.error('Error fetching suppliers:', err);
             toast.error('Failed to load suppliers');
@@ -89,8 +105,12 @@ export default function SuppliersPage() {
     };
 
     useEffect(() => {
-        fetchSuppliers();
-    }, []);
+        const delayDebounceFn = setTimeout(() => {
+            fetchSuppliers();
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, page, rowsPerPage]);
 
     const fetchContactsForSupplier = async (supplierId) => {
         try {
@@ -304,6 +324,15 @@ export default function SuppliersPage() {
         return primary ? `${primary.contact_name} (${primary.phone})` : supplier.supplier_contacts[0].contact_name;
     };
 
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -326,9 +355,29 @@ export default function SuppliersPage() {
                     onClick={() => handleOpenDialog()}
                     fullWidth={isMobile}
                 >
+
                     Add Supplier
                 </Button>
             </Box>
+
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Search suppliers by name or email..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                </CardContent>
+            </Card>
 
             {isMobile ? (
                 <Box>
@@ -475,6 +524,16 @@ export default function SuppliersPage() {
                     </TableContainer>
                 </Card>
             )}
+
+            <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={totalCount}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+            />
 
             {/* Add/Edit Dialog */}
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>

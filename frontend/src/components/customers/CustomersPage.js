@@ -24,8 +24,10 @@ import {
     Tabs,
     Tab,
     Chip,
+    TablePagination,
+    InputAdornment,
 } from '@mui/material';
-import { Add, Edit, Delete, History, Print, ShoppingCart, Repeat } from '@mui/icons-material';
+import { Add, Edit, Delete, History, Print, ShoppingCart, Repeat, Search } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
@@ -37,6 +39,12 @@ export default function CustomersPage() {
     const { settings } = useSettings();
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Pagination state
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [totalCount, setTotalCount] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [editingCustomer, setEditingCustomer] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -52,8 +60,12 @@ export default function CustomersPage() {
     });
 
     useEffect(() => {
-        fetchCustomers();
-    }, []);
+        const delayDebounceFn = setTimeout(() => {
+            fetchCustomers();
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, page, rowsPerPage]);
 
     const fetchCustomers = async () => {
         setLoading(true);
@@ -62,15 +74,26 @@ export default function CustomersPage() {
             if (!session) return;
             const orgId = session.user.id;
 
-            const { data, error } = await supabase
+            let query = supabase
                 .from('customers')
-                .select('*')
+                .select('*', { count: 'exact' })
                 .eq('organization_id', orgId)
                 .is('deleted_at', null)
                 .order('name');
 
+            // Apply search filter
+            if (searchTerm) {
+                query = query.or(`name.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,email.ilike.%${searchTerm}%`);
+            }
+
+            const from = page * rowsPerPage;
+            const to = from + rowsPerPage - 1;
+
+            const { data, count, error } = await query.range(from, to);
+
             if (error) throw error;
             setCustomers(data || []);
+            setTotalCount(count || 0);
         } catch (error) {
             console.error('Error fetching customers:', error);
             toast.error('Failed to load customers');
@@ -152,6 +175,15 @@ export default function CustomersPage() {
         setDeleteDialogOpen(true);
     };
 
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
     const handleConfirmDelete = async () => {
         if (!customerToDelete) return;
         try {
@@ -197,8 +229,28 @@ export default function CustomersPage() {
                 </Button>
             </Box>
 
+            {/* Search Bar */}
+            <Card sx={{ mb: 3 }}>
+                <CardContent>
+                    <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Search customers by name, phone, or email..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                </CardContent>
+            </Card>
+
             <Card>
-                <TableContainer sx={{ overflowX: 'auto' }}>
+                <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
                     <Table sx={{ minWidth: 700 }}>
                         <TableHead>
                             <TableRow>
@@ -247,6 +299,15 @@ export default function CustomersPage() {
                         </TableBody>
                     </Table>
                 </TableContainer>
+                <TablePagination
+                    rowsPerPageOptions={[10, 25, 50, 100]}
+                    component="div"
+                    count={totalCount}
+                    rowsPerPage={rowsPerPage}
+                    page={page}
+                    onPageChange={handleChangePage}
+                    onRowsPerPageChange={handleChangeRowsPerPage}
+                />
             </Card>
 
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
@@ -402,7 +463,7 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
             <DialogContent>
                 {tabValue === 0 ? (
                     // History Tab
-                    <TableContainer sx={{ overflowX: 'auto' }}>
+                    <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
                         <Table sx={{ minWidth: 700 }}>
                             <TableHead>
                                 <TableRow>
@@ -453,7 +514,7 @@ function CustomerHistoryDialog({ open, onClose, customer }) {
                         {frequentItems.length === 0 ? (
                             <Typography color="text.secondary">No frequent items found yet.</Typography>
                         ) : (
-                            <TableContainer sx={{ overflowX: 'auto' }}>
+                            <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
                                 <Table size="small" sx={{ minWidth: 500 }}>
                                     <TableHead>
                                         <TableRow>

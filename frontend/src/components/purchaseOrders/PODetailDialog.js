@@ -259,7 +259,13 @@ export default function PODetailDialog({ open, onClose, purchaseOrder, onRefresh
                                             <TableRow key={item.id}>
                                                 <TableCell>{item.products?.name}</TableCell>
                                                 <TableCell align="center">
-                                                    <Chip label={item.quantity_ordered} size="small" />
+                                                    <Chip
+                                                        label={item.boxes_ordered
+                                                            ? `${item.boxes_ordered} Boxes (${item.quantity_ordered})`
+                                                            : item.quantity_ordered
+                                                        }
+                                                        size="small"
+                                                    />
                                                 </TableCell>
                                                 <TableCell align="center">
                                                     <Chip

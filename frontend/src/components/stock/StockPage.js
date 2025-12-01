@@ -21,8 +21,9 @@ import {
     MenuItem,
     Chip,
     InputAdornment,
+    TablePagination,
 } from '@mui/material';
-import { Add, LocalShipping } from '@mui/icons-material';
+import { Add, LocalShipping, Search } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
@@ -35,6 +36,10 @@ export default function StockPage() {
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(25);
+    const [totalCount, setTotalCount] = useState(0);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
     const [formData, setFormData] = useState({
@@ -47,9 +52,16 @@ export default function StockPage() {
     });
 
     useEffect(() => {
-        fetchProducts();
         fetchSuppliers();
     }, []);
+
+    useEffect(() => {
+        const delayDebounceFn = setTimeout(() => {
+            fetchProducts();
+        }, 500);
+
+        return () => clearTimeout(delayDebounceFn);
+    }, [searchTerm, page, rowsPerPage]);
 
     async function fetchProducts() {
         setLoading(true);
@@ -61,15 +73,25 @@ export default function StockPage() {
             }
             const orgId = session.user.id;
 
-            const { data, error } = await supabase
+            let query = supabase
                 .from('products')
-                .select('*, suppliers(name)')
+                .select('*, suppliers(name)', { count: 'exact' })
                 .eq('organization_id', orgId)
                 .is('deleted_at', null)
                 .order('name');
 
+            if (searchTerm) {
+                query = query.or(`name.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%`);
+            }
+
+            const from = page * rowsPerPage;
+            const to = from + rowsPerPage - 1;
+
+            const { data, count, error } = await query.range(from, to);
+
             if (error) throw error;
             setProducts(data || []);
+            setTotalCount(count || 0);
         } catch (error) {
             console.error('Error fetching products:', error);
             toast.error('Failed to load products');
@@ -96,6 +118,8 @@ export default function StockPage() {
         setSelectedProduct(product);
         setFormData({
             quantity: '',
+            boxes_received: '',
+            items_per_box: product.items_per_box?.toString() || '1',
             cost_price: product.cost_price?.toString() || '',
             expiry_date: '',
             supplier_id: product.supplier_id || '',
@@ -134,6 +158,8 @@ export default function StockPage() {
                     product_id: selectedProduct.id,
                     supplier_id: formData.supplier_id || null,
                     quantity,
+                    boxes_received: formData.boxes_received ? parseInt(formData.boxes_received) : null,
+                    items_per_box: formData.items_per_box ? parseInt(formData.items_per_box) : null,
                     cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
                     expiry_date: formData.expiry_date || null,
                     received_date: formData.received_date,
@@ -161,6 +187,15 @@ export default function StockPage() {
         }
     };
 
+    const handleChangePage = (event, newPage) => {
+        setPage(newPage);
+    };
+
+    const handleChangeRowsPerPage = (event) => {
+        setRowsPerPage(parseInt(event.target.value, 10));
+        setPage(0);
+    };
+
     return (
         <Container maxWidth="xl">
             <Typography variant="h4" fontWeight={700} color="primary" mb={3}>
@@ -172,7 +207,24 @@ export default function StockPage() {
                     <Typography variant="h6" fontWeight={600} mb={2}>
                         Current Stock Levels
                     </Typography>
-                    <TableContainer sx={{ overflowX: 'auto' }}>
+
+                    <TextField
+                        fullWidth
+                        size="small"
+                        placeholder="Search products..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        sx={{ mb: 2 }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <Search />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+
+                    <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
                         <Table sx={{ minWidth: 800 }}>
                             <TableHead>
                                 <TableRow>
@@ -271,6 +323,15 @@ export default function StockPage() {
                             </TableBody>
                         </Table>
                     </TableContainer>
+                    <TablePagination
+                        rowsPerPageOptions={[10, 25, 50, 100]}
+                        component="div"
+                        count={totalCount}
+                        rowsPerPage={rowsPerPage}
+                        page={page}
+                        onPageChange={handleChangePage}
+                        onRowsPerPageChange={handleChangeRowsPerPage}
+                    />
                 </CardContent>
             </Card>
 
@@ -285,17 +346,55 @@ export default function StockPage() {
                     </DialogTitle>
                     <DialogContent>
                         <Grid container spacing={2} sx={{ mt: 1 }}>
-                            <Grid item xs={12}>
+                            <Grid item xs={12} sm={4}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Items per Box"
+                                    name="items_per_box"
+                                    value={formData.items_per_box}
+                                    onChange={(e) => {
+                                        handleChange(e);
+                                        // Auto-calculate quantity if boxes entered
+                                        if (formData.boxes_received && e.target.value) {
+                                            const total = parseInt(formData.boxes_received) * parseInt(e.target.value);
+                                            setFormData(prev => ({ ...prev, quantity: total.toString() }));
+                                        }
+                                    }}
+                                    inputProps={{ min: 1 }}
+                                    helperText="Tablets/items per box"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <TextField
+                                    fullWidth
+                                    type="number"
+                                    label="Boxes Received"
+                                    name="boxes_received"
+                                    value={formData.boxes_received}
+                                    onChange={(e) => {
+                                        handleChange(e);
+                                        // Auto-calculate total quantity
+                                        if (e.target.value && formData.items_per_box) {
+                                            const total = parseInt(e.target.value) * parseInt(formData.items_per_box);
+                                            setFormData(prev => ({ ...prev, quantity: total.toString() }));
+                                        }
+                                    }}
+                                    inputProps={{ min: 0 }}
+                                    helperText="Number of boxes"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={4}>
                                 <TextField
                                     fullWidth
                                     required
                                     type="number"
-                                    label="Quantity to Add"
+                                    label="Total Quantity (Items)"
                                     name="quantity"
                                     value={formData.quantity}
                                     onChange={handleChange}
                                     inputProps={{ min: 1 }}
-                                    helperText={`Current stock: ${selectedProduct?.stock || 0}`}
+                                    helperText={`Current: ${selectedProduct?.stock || 0}`}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -372,6 +471,6 @@ export default function StockPage() {
                     </DialogActions>
                 </form>
             </Dialog>
-        </Container>
+        </Container >
     );
 }
