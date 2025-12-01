@@ -81,7 +81,7 @@ export default function StockPage() {
                 .order('name');
 
             if (searchTerm) {
-                query = query.or(`name.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%`);
+                query = query.or(`name.ilike.%${searchTerm}%,form.ilike.%${searchTerm}%`);
             }
 
             const from = page * rowsPerPage;
@@ -261,8 +261,8 @@ export default function StockPage() {
                                                     </Typography>
                                                 </TableCell>
                                                 <TableCell>
-                                                    {product.category && (
-                                                        <Chip label={product.category} size="small" variant="outlined" />
+                                                    {product.form && (
+                                                        <Chip label={product.form} size="small" variant="outlined" />
                                                     )}
                                                 </TableCell>
                                                 <TableCell>

@@ -67,14 +67,15 @@ export default function ProductsPage() {
         name: '',
         generic_name: '',
         drug_type: '',
+        strength: '',
         price: '',
         cost_price: '',
         stock: '',
         min_stock_level: settings.low_stock_threshold || '10',
         expiry_date: '',
         supplier_id: '',
-        category: '',
-        barcode: '',
+        form: '',
+        batch_number: '',
         items_per_box: '1',
         price_per_box: '',
         selling_unit: 'item',
@@ -116,7 +117,7 @@ export default function ProductsPage() {
                 .order('created_at', { ascending: false });
 
             if (searchTerm) {
-                query = query.or(`name.ilike.%${searchTerm}%,category.ilike.%${searchTerm}%,barcode.ilike.%${searchTerm}%`);
+                query = query.or(`name.ilike.%${searchTerm}%,form.ilike.%${searchTerm}%,batch_number.ilike.%${searchTerm}%`);
             }
 
             // Apply filters based on activeFilter
@@ -189,14 +190,15 @@ export default function ProductsPage() {
                 name: product.name || '',
                 generic_name: product.generic_name || '',
                 drug_type: product.drug_type || '',
+                strength: product.strength || '',
                 price: product.price || '',
                 cost_price: product.cost_price || '',
                 stock: product.stock || '',
                 min_stock_level: product.min_stock_level || settings.low_stock_threshold || '10',
                 expiry_date: product.expiry_date || '',
                 supplier_id: product.supplier_id || '',
-                category: product.category || '',
-                barcode: product.barcode || '',
+                form: product.form || '',
+                batch_number: product.batch_number || '',
                 items_per_box: product.items_per_box || '1',
                 price_per_box: product.price_per_box || '',
                 selling_unit: product.selling_unit || 'item',
@@ -207,14 +209,15 @@ export default function ProductsPage() {
                 name: '',
                 generic_name: '',
                 drug_type: '',
+                strength: '',
                 price: '',
                 cost_price: '',
                 stock: '',
                 min_stock_level: settings.low_stock_threshold || '10',
                 expiry_date: '',
                 supplier_id: '',
-                category: '',
-                barcode: '',
+                form: '',
+                batch_number: '',
                 items_per_box: '1',
                 price_per_box: '',
                 selling_unit: 'item',
@@ -267,6 +270,7 @@ export default function ProductsPage() {
                 name: formData.name.trim(),
                 generic_name: formData.generic_name?.trim() || null,
                 drug_type: formData.drug_type || null,
+                strength: formData.strength?.trim() || null,
                 price: parseFloat(formData.price),
                 cost_price: formData.cost_price ? parseFloat(formData.cost_price) : null,
                 stock: formData.stock ? parseInt(formData.stock) : 0,
@@ -276,8 +280,8 @@ export default function ProductsPage() {
                 items_per_box: formData.items_per_box ? parseInt(formData.items_per_box) : 1,
                 price_per_box: formData.price_per_box ? parseFloat(formData.price_per_box) : null,
                 selling_unit: formData.selling_unit || 'item',
-                category: formData.category || null,
-                barcode: formData.barcode || null,
+                form: formData.form || null,
+                batch_number: formData.batch_number || null,
             };
 
             if (editingProduct) {
@@ -395,7 +399,7 @@ export default function ProductsPage() {
                 <CardContent>
                     <TextField
                         fullWidth
-                        placeholder="Search products by name, category, or barcode..."
+                        placeholder="Search products by name, form, or batch number..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         InputProps={{
@@ -435,9 +439,9 @@ export default function ProductsPage() {
                                                         {product.generic_name}
                                                     </Typography>
                                                 )}
-                                                {product.barcode && (
+                                                {product.batch_number && (
                                                     <Typography variant="caption" color="text.secondary">
-                                                        {product.barcode}
+                                                        {product.batch_number}
                                                     </Typography>
                                                 )}
                                             </Box>
@@ -463,8 +467,8 @@ export default function ProductsPage() {
                                             {product.drug_type && (
                                                 <Chip label={product.drug_type} size="small" variant="outlined" color="primary" />
                                             )}
-                                            {product.category && (
-                                                <Chip label={product.category} size="small" variant="outlined" />
+                                            {product.form && (
+                                                <Chip label={product.form} size="small" variant="outlined" />
                                             )}
                                             <Chip
                                                 label={`${formatNumber(product.stock)} units`}
@@ -515,7 +519,7 @@ export default function ProductsPage() {
                             <TableHead>
                                 <TableRow>
                                     <TableCell><strong>Name</strong></TableCell>
-                                    <TableCell><strong>Category</strong></TableCell>
+                                    <TableCell><strong>Form</strong></TableCell>
                                     <TableCell><strong>Price</strong></TableCell>
                                     <TableCell><strong>Stock</strong></TableCell>
                                     <TableCell><strong>Expiry</strong></TableCell>
@@ -550,18 +554,18 @@ export default function ProductsPage() {
                                                             {product.generic_name}
                                                         </Typography>
                                                     )}
-                                                    {product.barcode && (
+                                                    {product.batch_number && (
                                                         <Typography variant="caption" color="text.secondary">
-                                                            {product.barcode}
+                                                            {product.batch_number}
                                                         </Typography>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {product.drug_type && (
-                                                        <Chip label={product.drug_type} size="small" variant="outlined" color="primary" sx={{ mr: 0.5 }} />
+                                                    {product.form && (
+                                                        <Chip label={product.form} size="small" variant="outlined" color="primary" sx={{ mr: 0.5 }} />
                                                     )}
-                                                    {product.category && (
-                                                        <Chip label={product.category} size="small" variant="outlined" />
+                                                    {product.strength && (
+                                                        <Chip label={product.strength} size="small" variant="outlined" />
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
@@ -665,7 +669,10 @@ export default function ProductsPage() {
                                                 setFormData(prev => ({
                                                     ...prev,
                                                     name: medicine.brand_name,
-                                                    category: medicine.dosage_form,
+                                                    generic_name: medicine.generic_name || '',
+                                                    form: medicine.dosage_form || '',
+                                                    strength: medicine.strength || '',
+                                                    drug_type: medicine.dosage_form ? medicine.dosage_form.charAt(0).toUpperCase() + medicine.dosage_form.slice(1) : '',
                                                     // Try to extract items_per_box from standard_packaging
                                                     items_per_box: extractItemsPerBox(medicine.standard_packaging) || prev.items_per_box,
                                                 }));
@@ -704,6 +711,16 @@ export default function ProductsPage() {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
+                                    label="Strength"
+                                    name="strength"
+                                    value={formData.strength}
+                                    onChange={handleChange}
+                                    placeholder="e.g., 500mg, 10ml"
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={6}>
+                                <TextField
+                                    fullWidth
                                     select
                                     label="Drug Type"
                                     name="drug_type"
@@ -727,28 +744,12 @@ export default function ProductsPage() {
                             <Grid item xs={12} sm={6}>
                                 <TextField
                                     fullWidth
-                                    select
-                                    label="Category"
-                                    name="category"
-                                    value={formData.category}
+                                    label="Form"
+                                    name="form"
+                                    value={formData.form}
                                     onChange={handleChange}
-                                    SelectProps={{ native: true }}
-                                >
-                                    <option value="">Select Category</option>
-                                    <option value="Analgesic">Analgesic (Pain Relief)</option>
-                                    <option value="Antibiotic">Antibiotic</option>
-                                    <option value="Antacid">Antacid</option>
-                                    <option value="Antihistamine">Antihistamine (Allergy)</option>
-                                    <option value="Antiviral">Antiviral</option>
-                                    <option value="Antifungal">Antifungal</option>
-                                    <option value="Antipyretic">Antipyretic (Fever)</option>
-                                    <option value="Cardiovascular">Cardiovascular</option>
-                                    <option value="Diabetes">Diabetes</option>
-                                    <option value="Gastrointestinal">Gastrointestinal</option>
-                                    <option value="Respiratory">Respiratory</option>
-                                    <option value="Vitamin">Vitamin/Supplement</option>
-                                    <option value="Other">Other</option>
-                                </TextField>
+                                    placeholder="e.g., Tablet, Syrup, Injection"
+                                />
                             </Grid>
                             <Grid item xs={12} sm={6}>
                                 <TextField
@@ -877,11 +878,11 @@ export default function ProductsPage() {
                             <Grid item xs={12}>
                                 <TextField
                                     fullWidth
-                                    label="Barcode"
-                                    name="barcode"
-                                    value={formData.barcode}
+                                    label="Batch Number"
+                                    name="batch_number"
+                                    value={formData.batch_number}
                                     onChange={handleChange}
-                                    placeholder="Optional"
+                                    placeholder="Optional - for tracking batches"
                                 />
                             </Grid>
                         </Grid>

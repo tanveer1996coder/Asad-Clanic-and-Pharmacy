@@ -147,7 +147,7 @@ export default function ReportsPage() {
             // Low Stock
             dataToExport = lowStockReport.map(p => ({
                 Product: p.name,
-                Category: p.category,
+                Form: p.form,
                 Stock: p.stock,
                 'Min Level': p.min_stock_level
             }));
@@ -411,7 +411,7 @@ export default function ReportsPage() {
                                             {lowStockReport.map((item, index) => (
                                                 <TableRow key={index}>
                                                     <TableCell>{item.name}</TableCell>
-                                                    <TableCell>{item.category || '—'}</TableCell>
+                                                    <TableCell>{item.form || '—'}</TableCell>
                                                     <TableCell>{formatNumber(item.stock)}</TableCell>
                                                     <TableCell>{item.min_stock_level}</TableCell>
                                                     <TableCell>

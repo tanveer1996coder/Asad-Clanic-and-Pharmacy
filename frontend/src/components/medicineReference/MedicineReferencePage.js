@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     Container,
@@ -29,6 +29,8 @@ import {
     TablePagination,
     FormControlLabel,
     Checkbox,
+    LinearProgress,
+    Alert,
 } from '@mui/material';
 import {
     Add,
@@ -37,8 +39,11 @@ import {
     Search,
     LocalPharmacy,
     Warning,
+    CloudUpload,
+    Download,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
+import Papa from 'papaparse';
 import { supabase } from '../../supabaseClient';
 import ConfirmDialog from '../shared/ConfirmDialog';
 
@@ -55,6 +60,11 @@ export default function MedicineReferencePage() {
     const [medicineToDelete, setMedicineToDelete] = useState(null);
     const [categoryFilter, setCategoryFilter] = useState('');
     const [dosageFormFilter, setDosageFormFilter] = useState('');
+
+    // Import State
+    const [importing, setImporting] = useState(false);
+    const [importProgress, setImportProgress] = useState(0);
+    const fileInputRef = useRef(null);
 
     const [formData, setFormData] = useState({
         generic_name: '',
@@ -275,6 +285,99 @@ export default function MedicineReferencePage() {
         setPage(0);
     };
 
+    // --- CSV Import Logic ---
+
+    const handleImportClick = () => {
+        fileInputRef.current.click();
+    };
+
+    const handleDownloadTemplate = () => {
+        const csvContent = "brand_name,generic_name,strength,dosage_form,manufacturer,category,standard_packaging,formula\nPanadol,Paracetamol,500mg,tablet,GSK,Painkiller,10x10,Paracetamol\nAugmentin,Amoxicillin + Clavulanic Acid,625mg,tablet,GSK,Antibiotic,10x6,Amoxicillin";
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'medicine_import_template.csv');
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const handleFileChange = (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        setImporting(true);
+        setImportProgress(0);
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                await processImport(results.data);
+                event.target.value = ''; // Reset input
+            },
+            error: (error) => {
+                console.error('CSV Parse Error:', error);
+                toast.error('Failed to parse CSV file');
+                setImporting(false);
+            }
+        });
+    };
+
+    const processImport = async (data) => {
+        let successCount = 0;
+        let errorCount = 0;
+        const total = data.length;
+        const batchSize = 50;
+
+        try {
+            // Process in batches to avoid overwhelming the DB
+            for (let i = 0; i < total; i += batchSize) {
+                const batch = data.slice(i, i + batchSize);
+                const formattedBatch = batch.map(row => ({
+                    brand_name: row.brand_name || row.Brand || row.Name || '',
+                    generic_name: row.generic_name || row.Generic || row.ActiveIngredient || '',
+                    strength: row.strength || row.Strength || '',
+                    dosage_form: (row.dosage_form || row.Form || row.Type || 'other').toLowerCase(),
+                    manufacturer: row.manufacturer || row.Manufacturer || row.Company || '',
+                    category: row.category || row.Category || 'Other',
+                    standard_packaging: row.standard_packaging || row.Packing || '',
+                    formula: row.formula || row.Formula || '',
+                    // Default values
+                    prescription_required: false,
+                    controlled_substance: false
+                })).filter(item => item.brand_name && item.generic_name); // Basic validation
+
+                if (formattedBatch.length === 0) continue;
+
+                const { error } = await supabase
+                    .from('medicine_reference')
+                    .upsert(formattedBatch, { onConflict: 'brand_name,strength', ignoreDuplicates: true });
+
+                if (error) {
+                    console.error('Batch import error:', error);
+                    errorCount += batch.length;
+                } else {
+                    successCount += formattedBatch.length;
+                }
+
+                setImportProgress(Math.round(((i + batchSize) / total) * 100));
+            }
+
+            toast.success(`Import complete! Added/Updated: ${successCount}, Failed/Skipped: ${errorCount}`);
+            fetchMedicines();
+
+        } catch (error) {
+            console.error('Import error:', error);
+            toast.error('An error occurred during import');
+        } finally {
+            setImporting(false);
+            setImportProgress(0);
+        }
+    };
+
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -294,15 +397,50 @@ export default function MedicineReferencePage() {
                         Medicine Reference Database
                     </Typography>
                 </Box>
-                <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => handleOpenDialog()}
-                    fullWidth={isMobile}
-                >
-                    Add Medicine
-                </Button>
+                <Box display="flex" gap={1} flexWrap="wrap">
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        style={{ display: 'none' }}
+                        accept=".csv"
+                        onChange={handleFileChange}
+                    />
+                    <Button
+                        variant="outlined"
+                        startIcon={<Download />}
+                        onClick={handleDownloadTemplate}
+                        size={isMobile ? 'small' : 'medium'}
+                    >
+                        Template
+                    </Button>
+                    <Button
+                        variant="outlined"
+                        startIcon={<CloudUpload />}
+                        onClick={handleImportClick}
+                        disabled={importing}
+                        size={isMobile ? 'small' : 'medium'}
+                    >
+                        {importing ? 'Importing...' : 'Import CSV'}
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={() => handleOpenDialog()}
+                        size={isMobile ? 'small' : 'medium'}
+                    >
+                        Add Medicine
+                    </Button>
+                </Box>
             </Box>
+
+            {importing && (
+                <Box mb={3}>
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                        Importing medicines... {importProgress}%
+                    </Typography>
+                    <LinearProgress variant="determinate" value={importProgress} />
+                </Box>
+            )}
 
             <Card sx={{ mb: 3 }}>
                 <CardContent>

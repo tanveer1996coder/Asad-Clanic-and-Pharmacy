@@ -68,7 +68,7 @@ export default function SalesHistoryPage() {
 
             let query = supabase
                 .from('sales')
-                .select('*, products(name, category)', { count: 'exact' })
+                .select('*, products(name, form, strength)', { count: 'exact' })
                 .eq('organization_id', orgId)
                 .is('deleted_at', null)
                 .order('created_at', { ascending: false });
@@ -98,7 +98,7 @@ export default function SalesHistoryPage() {
                 const search = searchTerm.toLowerCase();
                 filteredData = data.filter(sale =>
                     sale.products?.name?.toLowerCase().includes(search) ||
-                    sale.products?.category?.toLowerCase().includes(search) ||
+                    sale.products?.form?.toLowerCase().includes(search) ||
                     sale.id.toLowerCase().includes(search)
                 );
             }

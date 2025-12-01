@@ -116,6 +116,28 @@ export const AuthProvider = ({ children }) => {
             console.error('Device tracking failed:', deviceError);
         }
 
+        // Check subscription status
+        try {
+            const { data: subscriptionData, error: subError } = await supabase
+                .rpc('check_subscription_status', { user_uuid: data.user.id });
+
+            if (subError) {
+                console.error('Subscription check failed:', subError);
+            } else if (subscriptionData && subscriptionData.length > 0) {
+                const subscription = subscriptionData[0];
+                if (!subscription.is_active) {
+                    // Sign out immediately
+                    await supabase.auth.signOut();
+                    throw new Error('SUBSCRIPTION_INACTIVE');
+                }
+            }
+        } catch (subCheckError) {
+            if (subCheckError.message === 'SUBSCRIPTION_INACTIVE') {
+                throw subCheckError;
+            }
+            console.error('Subscription validation error:', subCheckError);
+        }
+
         return data;
     };
 
