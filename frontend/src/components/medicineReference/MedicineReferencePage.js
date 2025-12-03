@@ -498,7 +498,7 @@ export default function MedicineReferencePage() {
                 <Typography>Loading...</Typography>
             ) : (
                 <Card>
-                    <TableContainer>
+                    <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
                         <Table size="small">
                             <TableHead>
                                 <TableRow>

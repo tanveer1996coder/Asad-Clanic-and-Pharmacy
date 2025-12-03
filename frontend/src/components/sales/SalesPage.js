@@ -41,15 +41,9 @@ export default function SalesPage() {
     const [searchParams] = useSearchParams();
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
-    const [sales, setSales] = useState([]);
     const [loading, setLoading] = useState(false);
     const [receiptModalOpen, setReceiptModalOpen] = useState(false);
     const [receiptData, setReceiptData] = useState({ invoice: null, items: [] });
-
-    // Pagination State
-    const [page, setPage] = useState(0);
-    const [rowsPerPage, setRowsPerPage] = useState(25);
-    const [totalCount, setTotalCount] = useState(0);
 
     // Cart & Form State
     const [cart, setCart] = useState([]);
@@ -115,9 +109,7 @@ export default function SalesPage() {
         };
     }, []);
 
-    useEffect(() => {
-        fetchRecentSales();
-    }, [page, rowsPerPage]);
+
 
     async function fetchCustomers() {
         const { data: { session } } = await supabase.auth.getSession();
@@ -170,34 +162,7 @@ export default function SalesPage() {
         return () => clearTimeout(delayDebounceFn);
     }, []);
 
-    async function fetchRecentSales() {
-        setLoading(true);
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-            setLoading(false);
-            return;
-        }
-        const orgId = session.user.id;
 
-        const from = page * rowsPerPage;
-        const to = from + rowsPerPage - 1;
-
-        const { data, count, error } = await supabase
-            .from('sales')
-            .select('*, products(name)', { count: 'exact' })
-            .eq('organization_id', orgId)
-            .is('deleted_at', null)
-            .order('created_at', { ascending: false })
-            .range(from, to);
-
-        if (error) {
-            console.error('Error fetching sales:', error);
-        } else {
-            setSales(data || []);
-            setTotalCount(count || 0);
-        }
-        setLoading(false);
-    }
 
     const handleProductChange = (event, newValue) => {
         setSelectedProduct(newValue);
@@ -425,7 +390,6 @@ export default function SalesPage() {
             setFormData(prev => ({ ...prev, discount: '0', notes: '' }));
             setSelectedCustomer(null);
             fetchProducts();
-            fetchRecentSales();
         } catch (error) {
             console.error('Checkout error:', error);
             toast.error('Checkout failed: ' + error.message);
@@ -434,39 +398,7 @@ export default function SalesPage() {
         }
     };
 
-    const handleDeleteSale = async (id) => {
-        if (!window.confirm('Delete this sale? Stock will NOT be restored.')) return;
 
-        try {
-            // Soft delete
-            const { error } = await supabase
-                .from('sales')
-                .update({ deleted_at: new Date().toISOString() })
-                .eq('id', id);
-
-            if (error) throw error;
-            toast.success('Sale deleted');
-            fetchRecentSales();
-        } catch (error) {
-            toast.error('Failed to delete sale');
-        }
-    };
-
-    const groupedSales = sales.reduce((acc, sale) => {
-        const date = sale.sale_date || sale.created_at?.split('T')[0];
-        if (!acc[date]) acc[date] = [];
-        acc[date].push(sale);
-        return acc;
-    }, {});
-
-    const handleChangePage = (event, newPage) => {
-        setPage(newPage);
-    };
-
-    const handleChangeRowsPerPage = (event) => {
-        setRowsPerPage(parseInt(event.target.value, 10));
-        setPage(0);
-    };
 
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
@@ -709,100 +641,15 @@ export default function SalesPage() {
                             </Card>
                         </Grid >
                     </Grid >
-                </Grid >
+                </Grid>
 
-                <Grid item xs={12}>
-                    <Card>
-                        <CardContent>
-                            <Typography variant="h6" fontWeight={600} mb={2}>
-                                Recent Sales
-                            </Typography>
-                            {loading && sales.length === 0 ? (
-                                <Typography>Loading...</Typography>
-                            ) : Object.keys(groupedSales).length === 0 ? (
-                                <Typography color="text.secondary">No sales recorded yet</Typography>
-                            ) : (
-                                Object.entries(groupedSales).map(([date, daySales]) => (
-                                    <Box key={date} mb={3}>
-                                        <Chip label={formatDate(date)} color="primary" variant="outlined" sx={{ mb: 2 }} />
-                                        <TableContainer sx={{ overflowX: 'auto' }}>
-                                            <Table sx={{ minWidth: 650 }}>
-                                                <TableHead>
-                                                    <TableRow>
-                                                        <TableCell>Product</TableCell>
-                                                        <TableCell align="right">Unit</TableCell>
-                                                        <TableCell align="right">Items</TableCell>
-                                                        <TableCell align="right">Boxes</TableCell>
-                                                        <TableCell align="right">Price</TableCell>
-                                                        <TableCell align="right">Total</TableCell>
-                                                        <TableCell align="right">Time</TableCell>
-                                                        <TableCell align="right">Actions</TableCell>
-                                                    </TableRow>
-                                                </TableHead>
-                                                <TableBody>
-                                                    {daySales.map((sale) => {
-                                                        const isBoxSale = sale.selling_unit === 'box';
-                                                        const itemsPerBox = sale.items_per_box || 1;
-                                                        const boxes = isBoxSale ? sale.quantity : 0;
-                                                        const items = isBoxSale ? sale.quantity * itemsPerBox : sale.quantity;
-
-                                                        return (
-                                                            <TableRow key={sale.id}>
-                                                                <TableCell>{sale.products?.name || 'Unknown'}</TableCell>
-                                                                <TableCell align="right">
-                                                                    <Chip
-                                                                        label={isBoxSale ? 'Box' : 'Item'}
-                                                                        size="small"
-                                                                        color={isBoxSale ? 'secondary' : 'primary'}
-                                                                        variant="outlined"
-                                                                    />
-                                                                </TableCell>
-                                                                <TableCell align="right">{formatNumber(items)}</TableCell>
-                                                                <TableCell align="right">{boxes > 0 ? formatNumber(boxes) : '—'}</TableCell>
-                                                                <TableCell align="right">{formatCurrency(sale.price_at_sale, settings.currency_symbol)}</TableCell>
-                                                                <TableCell align="right">
-                                                                    {formatCurrency(sale.quantity * sale.price_at_sale, settings.currency_symbol)}
-                                                                </TableCell>
-                                                                <TableCell align="right">{formatTime(sale.created_at)}</TableCell>
-                                                                <TableCell align="right">
-                                                                    <IconButton
-                                                                        size="small"
-                                                                        color="error"
-                                                                        onClick={() => handleDeleteSale(sale.id)}
-                                                                    >
-                                                                        <Delete fontSize="small" />
-                                                                    </IconButton>
-                                                                </TableCell>
-                                                            </TableRow>
-                                                        );
-                                                    })}
-                                                </TableBody>
-                                            </Table>
-                                        </TableContainer>
-                                    </Box>
-                                ))
-                            )}
-                        </CardContent>
-                        <TablePagination
-                            rowsPerPageOptions={[10, 25, 50, 100]}
-                            component="div"
-                            count={totalCount}
-                            rowsPerPage={rowsPerPage}
-                            page={page}
-                            onPageChange={handleChangePage}
-                            onRowsPerPageChange={handleChangeRowsPerPage}
-                        />
-                    </Card>
-                </Grid >
-            </Grid >
-
-            <ReceiptModal
-                open={receiptModalOpen}
-                onClose={() => setReceiptModalOpen(false)}
-                invoice={receiptData.invoice}
-                items={receiptData.items}
-                settings={settings}
-            />
-        </Container >
+                <ReceiptModal
+                    open={receiptModalOpen}
+                    onClose={() => setReceiptModalOpen(false)}
+                    invoice={receiptData.invoice}
+                    items={receiptData.items}
+                    settings={settings}
+                />
+        </Container>
     );
 }
