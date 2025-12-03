@@ -249,66 +249,114 @@ export default function CustomersPage() {
                 </CardContent>
             </Card>
 
-            <Card>
-                <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
-                    <Table sx={{ minWidth: 700 }}>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell><strong>Name</strong></TableCell>
-                                <TableCell><strong>Phone</strong></TableCell>
-                                <TableCell><strong>Email</strong></TableCell>
-                                <TableCell><strong>Address</strong></TableCell>
-                                <TableCell align="right"><strong>Actions</strong></TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {loading ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} align="center">Loading...</TableCell>
-                                </TableRow>
-                            ) : customers.length === 0 ? (
-                                <TableRow>
-                                    <TableCell colSpan={5} align="center">No customers found</TableCell>
-                                </TableRow>
-                            ) : (
-                                customers.map((customer) => (
-                                    <TableRow key={customer.id} hover>
-                                        <TableCell>
-                                            <Typography variant="body2" fontWeight={600}>{customer.name}</Typography>
-                                        </TableCell>
-                                        <TableCell>{customer.phone || '—'}</TableCell>
-                                        <TableCell>{customer.email || '—'}</TableCell>
-                                        <TableCell>{customer.address || '—'}</TableCell>
-                                        <TableCell align="right">
+            {isMobile ? (
+                <Box>
+                    {loading ? (
+                        <Typography align="center">Loading...</Typography>
+                    ) : customers.length === 0 ? (
+                        <Typography align="center">No customers found</Typography>
+                    ) : (
+                        customers.map((customer) => (
+                            <Card key={customer.id} variant="outlined" sx={{ mb: 2 }}>
+                                <CardContent>
+                                    <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
+                                        <Typography variant="h6" fontWeight={600}>
+                                            {customer.name}
+                                        </Typography>
+                                        <Box>
                                             <IconButton size="small" color="info" onClick={() => {
                                                 setSelectedCustomerForHistory(customer);
                                                 setHistoryOpen(true);
                                             }}>
-                                                <History />
+                                                <History fontSize="small" />
                                             </IconButton>
                                             <IconButton size="small" color="primary" onClick={() => handleOpenDialog(customer)}>
-                                                <Edit />
+                                                <Edit fontSize="small" />
                                             </IconButton>
                                             <IconButton size="small" color="error" onClick={() => handleDeleteClick(customer.id)}>
-                                                <Delete />
+                                                <Delete fontSize="small" />
                                             </IconButton>
-                                        </TableCell>
+                                        </Box>
+                                    </Box>
+
+                                    <Box mb={1}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            <strong>Phone:</strong> {customer.phone || '—'}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            <strong>Email:</strong> {customer.email || '—'}
+                                        </Typography>
+                                        <Typography variant="body2" color="text.secondary">
+                                            <strong>Address:</strong> {customer.address || '—'}
+                                        </Typography>
+                                    </Box>
+                                </CardContent>
+                            </Card>
+                        ))
+                    )}
+                </Box>
+            ) : (
+                <Card>
+                    <TableContainer sx={{ overflowX: 'auto', maxWidth: '100%' }}>
+                        <Table sx={{ minWidth: 700 }}>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell><strong>Name</strong></TableCell>
+                                    <TableCell><strong>Phone</strong></TableCell>
+                                    <TableCell><strong>Email</strong></TableCell>
+                                    <TableCell><strong>Address</strong></TableCell>
+                                    <TableCell align="right"><strong>Actions</strong></TableCell>
+                                </TableRow>
+                            </TableHead>
+                            <TableBody>
+                                {loading ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} align="center">Loading...</TableCell>
                                     </TableRow>
-                                ))
-                            )}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
-                <TablePagination
-                    rowsPerPageOptions={[10, 25, 50, 100]}
-                    component="div"
-                    count={totalCount}
-                    rowsPerPage={rowsPerPage}
-                    page={page}
-                    onPageChange={handleChangePage}
-                    onRowsPerPageChange={handleChangeRowsPerPage}
-                />
-            </Card>
+                                ) : customers.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={5} align="center">No customers found</TableCell>
+                                    </TableRow>
+                                ) : (
+                                    customers.map((customer) => (
+                                        <TableRow key={customer.id} hover>
+                                            <TableCell>
+                                                <Typography variant="body2" fontWeight={600}>{customer.name}</Typography>
+                                            </TableCell>
+                                            <TableCell>{customer.phone || '—'}</TableCell>
+                                            <TableCell>{customer.email || '—'}</TableCell>
+                                            <TableCell>{customer.address || '—'}</TableCell>
+                                            <TableCell align="right">
+                                                <IconButton size="small" color="info" onClick={() => {
+                                                    setSelectedCustomerForHistory(customer);
+                                                    setHistoryOpen(true);
+                                                }}>
+                                                    <History />
+                                                </IconButton>
+                                                <IconButton size="small" color="primary" onClick={() => handleOpenDialog(customer)}>
+                                                    <Edit />
+                                                </IconButton>
+                                                <IconButton size="small" color="error" onClick={() => handleDeleteClick(customer.id)}>
+                                                    <Delete />
+                                                </IconButton>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
+                </Card>
+            )}
+            <TablePagination
+                rowsPerPageOptions={[10, 25, 50, 100]}
+                component="div"
+                count={totalCount}
+                rowsPerPage={rowsPerPage}
+                page={page}
+                onPageChange={handleChangePage}
+                onRowsPerPageChange={handleChangeRowsPerPage}
+            />
 
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                 <form onSubmit={handleSubmit}>

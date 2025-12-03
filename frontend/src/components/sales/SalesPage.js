@@ -389,7 +389,7 @@ export default function SalesPage() {
             setCart([]);
             setFormData(prev => ({ ...prev, discount: '0', notes: '' }));
             setSelectedCustomer(null);
-            fetchProducts();
+            setSelectedCustomer(null);
         } catch (error) {
             console.error('Checkout error:', error);
             toast.error('Checkout failed: ' + error.message);
@@ -639,17 +639,18 @@ export default function SalesPage() {
                                     </Grid>
                                 </CardContent>
                             </Card>
-                        </Grid >
-                    </Grid >
+                        </Grid>
+                    </Grid>
                 </Grid>
+            </Grid>
 
-                <ReceiptModal
-                    open={receiptModalOpen}
-                    onClose={() => setReceiptModalOpen(false)}
-                    invoice={receiptData.invoice}
-                    items={receiptData.items}
-                    settings={settings}
-                />
+            <ReceiptModal
+                open={receiptModalOpen}
+                onClose={() => setReceiptModalOpen(false)}
+                invoice={receiptData.invoice}
+                items={receiptData.items}
+                settings={settings}
+            />
         </Container>
     );
 }
