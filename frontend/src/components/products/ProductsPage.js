@@ -668,12 +668,11 @@ export default function ProductsPage() {
                                                 // Auto-populate fields from medicine reference
                                                 setFormData(prev => ({
                                                     ...prev,
-                                                    name: medicine.brand_name,
+                                                    name: medicine.brand_name || '',
                                                     generic_name: medicine.generic_name || '',
                                                     form: medicine.dosage_form || '',
                                                     strength: medicine.strength || '',
                                                     drug_type: medicine.dosage_form ? medicine.dosage_form.charAt(0).toUpperCase() + medicine.dosage_form.slice(1) : '',
-                                                    // Try to extract items_per_box from standard_packaging
                                                     items_per_box: extractItemsPerBox(medicine.standard_packaging) || prev.items_per_box,
                                                 }));
                                                 toast.success(`Auto-filled from ${medicine.brand_name}`);
