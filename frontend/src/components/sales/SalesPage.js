@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     Container,
@@ -7,110 +7,86 @@ import {
     Typography,
     TextField,
     Button,
-    Divider,
     Grid,
     Box,
     Autocomplete,
+    IconButton,
+    Chip,
+    Dialog,
+    DialogTitle,
+    DialogContent,
+    DialogActions,
+    CircularProgress,
+    Paper,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
     TableRow,
-    IconButton,
-    Chip,
-    useTheme,
-    useMediaQuery,
-    TablePagination,
-    ToggleButton,
-    ToggleButtonGroup,
-    CircularProgress,
+    InputAdornment,
+    Divider
 } from '@mui/material';
-import { Add, Delete, ShoppingCart } from '@mui/icons-material';
+import {
+    Add,
+    Delete,
+    ShoppingCart,
+    Search,
+    Save,
+    Keyboard,
+    Close
+} from '@mui/icons-material';
+import {
+    useReactTable,
+    getCoreRowModel,
+    flexRender,
+} from '@tanstack/react-table';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
-import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { formatDate, formatTime } from '../../utils/dateHelpers';
-import { saveOfflineSale } from '../../utils/offlineStorage';
+import { formatCurrency } from '../../utils/formatters';
 import useSettings from '../../hooks/useSettings';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import DailySales from './DailySales';
 import ReceiptModal from '../shared/ReceiptModal';
 
 export default function SalesPage() {
     const { settings } = useSettings();
     const [searchParams] = useSearchParams();
+
+    // -- State --
     const [products, setProducts] = useState([]);
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [receiptModalOpen, setReceiptModalOpen] = useState(false);
     const [receiptData, setReceiptData] = useState({ invoice: null, items: [] });
+    const [helpOpen, setHelpOpen] = useState(false);
 
-    // Cart & Form State
+    // Cart & Selection
     const [cart, setCart] = useState([]);
-    const [selectedProduct, setSelectedProduct] = useState(null);
     const [selectedCustomer, setSelectedCustomer] = useState(null);
+    const [selectedProduct, setSelectedProduct] = useState(null);
 
-    // Check for date parameter from URL and set initial sale_date
-    const urlDate = searchParams.get('date');
+    // Form Data (Global for sale)
+    const [globalDiscount, setGlobalDiscount] = useState('0');
+    const [paymentMethod, setPaymentMethod] = useState('cash');
+    const [saleDate, setSaleDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0]);
+    const [notes, setNotes] = useState('');
 
-    // Calculate local today date YYYY-MM-DD
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
-    const day = String(now.getDate()).padStart(2, '0');
-    const localToday = `${year}-${month}-${day}`;
+    // Refs for focus management
+    const searchInputRef = useRef(null);
+    const discountInputRef = useRef(null);
+    const payButtonRef = useRef(null);
 
-    const [formData, setFormData] = useState({
-        quantity: '1',
-        price_at_sale: '',
-        sale_date: urlDate || localToday,
-        payment_method: 'cash',
-        discount: '0',
-        notes: '',
-        selling_unit: 'item', // 'box' or 'item'
-    });
-
+    // -- Effects --
     useEffect(() => {
         fetchCustomers();
-
-        // Listen for auth changes
-        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange((event, session) => {
-            if (event === 'SIGNED_IN' || session) {
-                fetchCustomers();
-            }
-        });
-
-        // Check for quick reorder data
-        const quickReorderData = localStorage.getItem('quick_reorder');
-        if (quickReorderData) {
-            try {
-                const { customer, items } = JSON.parse(quickReorderData);
-                setSelectedCustomer(customer);
-
-                // Add items to cart
-                const cartItems = items.map(item => ({
-                    product: item.product,
-                    quantity: item.quantity,
-                    price: item.price,
-                    total: item.quantity * item.price
-                }));
-
-                setCart(cartItems);
-                toast.success(`Loaded ${items.length} items for ${customer.name}`);
-                localStorage.removeItem('quick_reorder');
-            } catch (error) {
-                console.error('Error loading quick reorder:', error);
-                localStorage.removeItem('quick_reorder');
-            }
+        // Focus search on mount
+        if (searchInputRef.current) {
+            searchInputRef.current.focus();
         }
-
-        return () => {
-            authSubscription.unsubscribe();
-        };
     }, []);
 
-
-
+    // -- Data Fetching --
     async function fetchCustomers() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -125,7 +101,6 @@ export default function SalesPage() {
         setCustomers(data || []);
     }
 
-    // Server-side search for products
     const searchProducts = async (query) => {
         if (!query || query.length < 2) {
             setProducts([]);
@@ -144,152 +119,86 @@ export default function SalesPage() {
             setProducts(data || []);
         } catch (error) {
             console.error('Error searching products:', error);
-            // Fallback to empty if RPC fails (e.g. migration not run)
             setProducts([]);
         } finally {
             setLoading(false);
         }
     };
 
-    // Debounce the search
-    useEffect(() => {
-        const delayDebounceFn = setTimeout(() => {
-            if (selectedProduct === null) { // Only search if not selecting a product
-                // We don't auto-search on mount anymore, only on input
+    // -- Cart Logic --
+    const addToCart = (product) => {
+        if (!product) return;
+
+        // Default to item unit
+        const sellingUnit = product.selling_unit === 'box' ? 'box' : 'item';
+        const price = sellingUnit === 'box'
+            ? (product.price_per_box || (product.price * (product.items_per_box || 1)))
+            : product.price;
+
+        setCart(prev => {
+            const existingIndex = prev.findIndex(item => item.product.id === product.id && item.selling_unit === sellingUnit);
+            if (existingIndex >= 0) {
+                const newCart = [...prev];
+                newCart[existingIndex].quantity += 1;
+                newCart[existingIndex].total = newCart[existingIndex].quantity * newCart[existingIndex].price;
+                return newCart;
+            } else {
+                return [...prev, {
+                    product,
+                    quantity: 1,
+                    price: parseFloat(price),
+                    selling_unit: sellingUnit,
+                    total: parseFloat(price)
+                }];
             }
-        }, 500);
+        });
 
-        return () => clearTimeout(delayDebounceFn);
-    }, []);
-
-
-
-    const handleProductChange = (event, newValue) => {
-        setSelectedProduct(newValue);
-        if (newValue) {
-            // Default to 'item' unless product is only sold by box
-            const defaultUnit = newValue.selling_unit === 'box' ? 'box' : 'item';
-
-            let price = newValue.price;
-            if (defaultUnit === 'box') {
-                price = newValue.price_per_box || (newValue.price * (newValue.items_per_box || 1));
-            }
-
-            setFormData(prev => ({
-                ...prev,
-                price_at_sale: price,
-                selling_unit: defaultUnit,
-                quantity: '1'
-            }));
-        }
+        // Reset selection and focus back to search
+        setSelectedProduct(null);
+        if (searchInputRef.current) searchInputRef.current.focus();
+        toast.success(`Added ${product.name}`);
     };
 
-    const handleUnitChange = (event, newUnit) => {
-        if (newUnit !== null && selectedProduct) {
-            let price = selectedProduct.price;
+    const updateCartItem = (index, field, value) => {
+        setCart(prev => {
+            const newCart = [...prev];
+            const item = newCart[index];
 
-            if (newUnit === 'box') {
-                price = selectedProduct.price_per_box || (selectedProduct.price * (selectedProduct.items_per_box || 1));
+            if (field === 'quantity') {
+                const qty = parseInt(value) || 0;
+                item.quantity = qty;
+                item.total = qty * item.price;
+            } else if (field === 'price') {
+                const price = parseFloat(value) || 0;
+                item.price = price;
+                item.total = item.quantity * price;
+            } else if (field === 'selling_unit') {
+                const newUnit = value;
+                item.selling_unit = newUnit;
+
+                // Recalculate price based on new unit
+                if (newUnit === 'box') {
+                    item.price = parseFloat(item.product.price_per_box || (item.product.price * (item.product.items_per_box || 1)));
+                } else {
+                    item.price = parseFloat(item.product.price);
+                }
+                item.total = item.quantity * item.price;
             }
 
-            setFormData(prev => ({
-                ...prev,
-                selling_unit: newUnit,
-                price_at_sale: price
-            }));
-        }
-    };
-
-    const handleChange = (e) => {
-        setFormData({
-            ...formData,
-            [e.target.name]: e.target.value,
+            return newCart;
         });
     };
 
-    const handleAddToCart = (e) => {
-        e.preventDefault();
-        if (!selectedProduct) {
-            toast.error('Please select a product');
-            return;
-        }
-
-        const quantity = parseInt(formData.quantity);
-        let price = parseFloat(formData.price_at_sale);
-        let actualQuantity = quantity; // Quantity in items to deduct from stock
-
-        if (quantity <= 0 || isNaN(price)) {
-            toast.error('Invalid quantity or price');
-            return;
-        }
-
-        // Handle box-based selling
-        if (formData.selling_unit === 'box') {
-            const itemsPerBox = selectedProduct.items_per_box || 1;
-            actualQuantity = quantity * itemsPerBox;
-
-            // Use price_per_box if available, otherwise calculate from item price
-            if (selectedProduct.price_per_box) {
-                price = parseFloat(selectedProduct.price_per_box);
-            } else {
-                price = parseFloat(selectedProduct.price) * itemsPerBox;
-            }
-        } else {
-            // Item-based selling - apply rounding rules
-            const priceDecimal = price - Math.floor(price);
-            if (priceDecimal >= 0.25) {
-                // Round up to next integer
-                price = Math.ceil(price);
-            } else {
-                // Round down
-                price = Math.floor(price);
-            }
-        }
-
-        if (selectedProduct.stock < actualQuantity) {
-            toast.error(`Not enough stock! Available: ${selectedProduct.stock} items`);
-            return;
-        }
-
-        // Check if product already in cart
-        const existingItemIndex = cart.findIndex(item =>
-            item.product.id === selectedProduct.id &&
-            item.selling_unit === formData.selling_unit
-        );
-
-        if (existingItemIndex >= 0) {
-            const newCart = [...cart];
-            newCart[existingItemIndex].quantity += quantity;
-            newCart[existingItemIndex].actual_quantity += actualQuantity;
-            newCart[existingItemIndex].total = newCart[existingItemIndex].quantity * newCart[existingItemIndex].price;
-            setCart(newCart);
-        } else {
-            setCart([...cart, {
-                product: selectedProduct,
-                quantity, // Display quantity (boxes or items)
-                actual_quantity: actualQuantity, // Actual items to deduct
-                price,
-                total: quantity * price,
-                selling_unit: formData.selling_unit,
-            }]);
-        }
-
-        // Reset product selection but keep date/customer
-        setSelectedProduct(null);
-        setFormData(prev => ({ ...prev, quantity: '1', price_at_sale: '', selling_unit: 'item' }));
-        toast.success('Added to cart');
+    const removeFromCart = (index) => {
+        setCart(prev => prev.filter((_, i) => i !== index));
     };
 
-    const handleRemoveFromCart = (index) => {
-        const newCart = [...cart];
-        newCart.splice(index, 1);
-        setCart(newCart);
+    const calculateTotal = () => {
+        const subtotal = cart.reduce((sum, item) => sum + item.total, 0);
+        return subtotal - (parseFloat(globalDiscount) || 0);
     };
 
-    const calculateCartTotal = () => {
-        return cart.reduce((sum, item) => sum + (item.quantity * item.price), 0);
-    };
-
+    // -- Checkout Logic --
     const handleCheckout = async () => {
         if (cart.length === 0) {
             toast.error('Cart is empty');
@@ -299,24 +208,20 @@ export default function SalesPage() {
         setLoading(true);
         try {
             const { data: { session } } = await supabase.auth.getSession();
-            if (!session) {
-                toast.error('Please log in');
-                return;
-            }
+            if (!session) throw new Error('Not authenticated');
 
-            const totalAmount = calculateCartTotal();
-            const discount = parseFloat(formData.discount) || 0;
-            const finalAmount = totalAmount - discount;
+            const totalAmount = calculateTotal();
+            const discount = parseFloat(globalDiscount) || 0;
 
             // 1. Create Invoice
             const { data: invoice, error: invoiceError } = await supabase
                 .from('invoices')
                 .insert([{
                     customer_id: selectedCustomer?.id || null,
-                    total_amount: finalAmount,
+                    total_amount: totalAmount,
                     discount: discount,
-                    payment_method: formData.payment_method,
-                    notes: formData.notes,
+                    payment_method: paymentMethod,
+                    notes: notes,
                     organization_id: session.user.id
                 }])
                 .select()
@@ -325,324 +230,407 @@ export default function SalesPage() {
             if (invoiceError) throw invoiceError;
 
             // 2. Create Sales Records
-            // 2. Create Sales Records
-            const salesDataWithUnits = cart.map(item => ({
+            const salesData = cart.map(item => ({
                 invoice_id: invoice.id,
                 product_id: item.product.id,
                 quantity: item.quantity,
                 price_at_sale: item.price,
-                sale_date: formData.sale_date,
+                sale_date: saleDate,
                 organization_id: session.user.id,
                 selling_unit: item.selling_unit,
                 items_per_box: item.product.items_per_box
             }));
 
-            // Try inserting with new columns first
-            const { error: salesError } = await supabase
-                .from('sales')
-                .insert(salesDataWithUnits);
+            const { error: salesError } = await supabase.from('sales').insert(salesData);
+            if (salesError) throw salesError;
 
-            if (salesError) {
-                // Fallback: If column doesn't exist (migration not run), insert without unit details
-                if (salesError.message?.includes('column') || salesError.code === 'PGRST204') {
-                    console.warn('Migration not run? Retrying without unit details...');
-                    const salesDataLegacy = cart.map(item => ({
-                        invoice_id: invoice.id,
-                        product_id: item.product.id,
-                        quantity: item.quantity,
-                        price_at_sale: item.price,
-                        sale_date: formData.sale_date,
-                        organization_id: session.user.id
-                    }));
-
-                    const { error: retryError } = await supabase
-                        .from('sales')
-                        .insert(salesDataLegacy);
-
-                    if (retryError) throw retryError;
-                } else {
-                    throw salesError;
-                }
-            }
-
-            // 3. Update Stock - use actual_quantity for box sales
+            // 3. Update Stock
             for (const item of cart) {
+                const actualQty = item.selling_unit === 'box'
+                    ? item.quantity * (item.product.items_per_box || 1)
+                    : item.quantity;
+
                 await supabase.rpc('decrease_stock', {
                     p_id: item.product.id,
-                    q_sold: item.actual_quantity || item.quantity
+                    q_sold: actualQty
                 });
             }
 
-            // 4. Clear cart and show success
-            const savedInvoice = { ...invoice, id: invoice.id };
-            const savedItems = cart.map(item => ({
-                ...item,
-                products: item.product
-            }));
-
-            toast.success('Sale completed successfully!');
-
-            // Show receipt modal
-            setReceiptData({ invoice: savedInvoice, items: savedItems });
+            // 4. Success
+            toast.success('Sale completed!');
+            setReceiptData({
+                invoice: { ...invoice },
+                items: cart.map(i => ({ ...i, products: i.product }))
+            });
             setReceiptModalOpen(true);
 
+            // Reset
             setCart([]);
-            setFormData(prev => ({ ...prev, discount: '0', notes: '' }));
+            setGlobalDiscount('0');
+            setNotes('');
             setSelectedCustomer(null);
-            setSelectedCustomer(null);
+            if (searchInputRef.current) searchInputRef.current.focus();
+
         } catch (error) {
             console.error('Checkout error:', error);
-            toast.error('Checkout failed: ' + error.message);
+            toast.error(error.message);
         } finally {
             setLoading(false);
         }
     };
 
+    const toggleUnit = (index) => {
+        if (index < 0 || index >= cart.length) return;
+        const item = cart[index];
+        const newUnit = item.selling_unit === 'box' ? 'item' : 'box';
+        updateCartItem(index, 'selling_unit', newUnit);
+    };
 
+    const handleInputKeyDown = (e, index) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            // On Enter, move focus back to search to add next item
+            searchInputRef.current?.focus();
+        }
+    };
 
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+    // -- Keyboard Shortcuts --
+    useKeyboardShortcuts({
+        'F2': () => searchInputRef.current?.focus(),
+        'F4': () => handleCheckout(), // Pay / Checkout
+        'F8': () => toggleUnit(cart.length - 1), // Toggle Unit of last item
+        'F9': () => discountInputRef.current?.focus(),
+        'Escape': () => {
+            setSelectedProduct(null);
+            if (document.activeElement === searchInputRef.current) {
+                searchInputRef.current.blur();
+            } else {
+                searchInputRef.current?.focus();
+            }
+        },
+        'Shift+?': () => setHelpOpen(true)
+    });
+
+    // -- Table Config --
+    const columns = useMemo(() => [
+        {
+            header: 'Product',
+            accessorKey: 'product.name',
+            cell: info => (
+                <Box>
+                    <Typography variant="body2" fontWeight="bold">{info.getValue()}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Stock: {info.row.original.product.stock} | Exp: {info.row.original.product.expiry_date || 'N/A'}
+                    </Typography>
+                </Box>
+            )
+        },
+        {
+            header: 'Stock',
+            accessorKey: 'product.stock',
+            cell: info => (
+                <Typography variant="body2" color={info.getValue() < 10 ? 'error' : 'text.primary'}>
+                    {info.getValue()}
+                </Typography>
+            )
+        },
+        {
+            header: 'Unit',
+            accessorKey: 'selling_unit',
+            cell: info => (
+                <Chip
+                    label={info.getValue().toUpperCase()}
+                    size="small"
+                    color={info.getValue() === 'box' ? 'secondary' : 'default'}
+                    variant="outlined"
+                    onClick={() => {
+                        const currentUnit = info.getValue();
+                        const newUnit = currentUnit === 'box' ? 'item' : 'box';
+                        updateCartItem(info.row.index, 'selling_unit', newUnit);
+                    }}
+                    sx={{ cursor: 'pointer', minWidth: 60 }}
+                />
+            )
+        },
+        {
+            header: 'Price',
+            accessorKey: 'price',
+            cell: info => (
+                <TextField
+                    type="number"
+                    variant="standard"
+                    size="small"
+                    value={info.getValue()}
+                    onChange={e => updateCartItem(info.row.index, 'price', e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown(e, info.row.index)}
+                    InputProps={{ disableUnderline: true }}
+                    sx={{ width: 80 }}
+                />
+            )
+        },
+        {
+            header: 'Qty',
+            accessorKey: 'quantity',
+            cell: info => (
+                <TextField
+                    type="number"
+                    variant="outlined"
+                    size="small"
+                    autoFocus={info.row.index === cart.length - 1} // Auto-focus new rows
+                    value={info.getValue()}
+                    onChange={e => updateCartItem(info.row.index, 'quantity', e.target.value)}
+                    onKeyDown={(e) => handleInputKeyDown(e, info.row.index)}
+                    sx={{ width: 80 }}
+                    inputProps={{ min: 1 }}
+                />
+            )
+        },
+        {
+            header: 'Total',
+            accessorKey: 'total',
+            cell: info => (
+                <Typography fontWeight="bold">
+                    {formatCurrency(info.getValue(), settings.currency_symbol)}
+                </Typography>
+            )
+        },
+        {
+            id: 'actions',
+            cell: info => (
+                <IconButton color="error" size="small" onClick={() => removeFromCart(info.row.index)}>
+                    <Delete fontSize="small" />
+                </IconButton>
+            )
+        }
+    ], [cart, settings.currency_symbol]);
+
+    const table = useReactTable({
+        data: cart,
+        columns,
+        getCoreRowModel: getCoreRowModel(),
+    });
 
     return (
-        <Container maxWidth="xl">
-            <Typography variant="h4" fontWeight={700} color="primary" mb={3}>
-                Sales
-            </Typography>
+        <Container maxWidth="xl" sx={{ pb: 4 }}>
+            {/* Header & Search */}
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h5" fontWeight={700} color="primary">
+                    Sales Terminal
+                </Typography>
+                <Button startIcon={<Keyboard />} onClick={() => setHelpOpen(true)} size="small">
+                    Shortcuts
+                </Button>
+            </Box>
 
-            <Grid container spacing={3}>
-                <Grid item xs={12} md={3}>
-                    <DailySales />
+            <Grid container spacing={2}>
+                {/* Left: Sales Table & Search */}
+                <Grid item xs={12} md={8}>
+                    <Paper sx={{ p: 2, mb: 2 }}>
+                        <Grid container spacing={2} alignItems="center">
+                            <Grid item xs={12} md={8}>
+                                <Autocomplete
+                                    id="product-search"
+                                    options={products}
+                                    getOptionLabel={(option) => option.name}
+                                    filterOptions={(x) => x}
+                                    value={selectedProduct}
+                                    onChange={(e, val) => {
+                                        if (val) addToCart(val);
+                                    }}
+                                    onInputChange={(e, val) => {
+                                        if (e?.type === 'change') searchProducts(val);
+                                    }}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            inputRef={searchInputRef}
+                                            label="Scan Barcode or Search Product (F2)"
+                                            placeholder="Type product name..."
+                                            fullWidth
+                                            InputProps={{
+                                                ...params.InputProps,
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <Search color="action" />
+                                                    </InputAdornment>
+                                                ),
+                                                endAdornment: (
+                                                    <>
+                                                        {loading ? <CircularProgress size={20} /> : null}
+                                                        {params.InputProps.endAdornment}
+                                                    </>
+                                                )
+                                            }}
+                                        />
+                                    )}
+                                    renderOption={(props, option) => (
+                                        <li {...props}>
+                                            <Box display="flex" justifyContent="space-between" width="100%">
+                                                <Box>
+                                                    <Typography variant="body1">{option.name}</Typography>
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {option.category}
+                                                    </Typography>
+                                                </Box>
+                                                <Box textAlign="right">
+                                                    <Typography variant="body2" color={option.stock < 10 ? 'error.main' : 'success.main'}>
+                                                        {option.stock} in stock
+                                                    </Typography>
+                                                    <Typography variant="body2" fontWeight="bold">
+                                                        {formatCurrency(option.price, settings.currency_symbol)}
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </li>
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <Autocomplete
+                                    options={customers}
+                                    getOptionLabel={(option) => option.name}
+                                    value={selectedCustomer}
+                                    onChange={(e, val) => setSelectedCustomer(val)}
+                                    renderInput={(params) => <TextField {...params} label="Customer (Optional)" fullWidth />}
+                                />
+                            </Grid>
+                        </Grid>
+                    </Paper>
+
+                    <TableContainer component={Paper} sx={{ maxHeight: '60vh' }}>
+                        <Table stickyHeader size="small">
+                            <TableHead>
+                                {table.getHeaderGroups().map(headerGroup => (
+                                    <TableRow key={headerGroup.id}>
+                                        {headerGroup.headers.map(header => (
+                                            <TableCell key={header.id} sx={{ fontWeight: 'bold', bgcolor: 'background.default' }}>
+                                                {flexRender(header.column.columnDef.header, header.getContext())}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                            </TableHead>
+                            <TableBody>
+                                {table.getRowModel().rows.length === 0 ? (
+                                    <TableRow>
+                                        <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                                            <Typography color="text.secondary">
+                                                No items in cart. Search to add products.
+                                            </Typography>
+                                        </TableCell>
+                                    </TableRow>
+                                ) : (
+                                    table.getRowModel().rows.map(row => (
+                                        <TableRow key={row.id} hover>
+                                            {row.getVisibleCells().map(cell => (
+                                                <TableCell key={cell.id}>
+                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                    ))
+                                )}
+                            </TableBody>
+                        </Table>
+                    </TableContainer>
                 </Grid>
 
-                <Grid item xs={12} md={9}>
-                    <Grid container spacing={3}>
-                        {/* Left Side: Input Form */}
-                        <Grid item xs={12} md={6}>
-                            <Card sx={{ height: '100%' }}>
-                                <CardContent>
-                                    <Typography variant="h6" fontWeight={600} mb={2}>
-                                        Add Items
-                                    </Typography>
-                                    <form onSubmit={handleAddToCart}>
-                                        <Grid container spacing={2}>
-                                            <Grid item xs={12}>
-                                                <Autocomplete
-                                                    value={selectedCustomer}
-                                                    onChange={(e, newValue) => setSelectedCustomer(newValue)}
-                                                    options={customers}
-                                                    getOptionLabel={(option) => option.name}
-                                                    renderInput={(params) => (
-                                                        <TextField
-                                                            {...params}
-                                                            label="Select Customer (Optional)"
-                                                            placeholder="Search customer..."
-                                                        />
-                                                    )}
-                                                />
-                                            </Grid>
-                                            <Grid item xs={12}>
-                                                <Autocomplete
-                                                    value={selectedProduct}
-                                                    onChange={handleProductChange}
-                                                    options={products}
-                                                    getOptionLabel={(option) => option.name}
-                                                    filterOptions={(x) => x}
-                                                    onInputChange={(event, newInputValue) => {
-                                                        if (event && event.type === 'change') {
-                                                            searchProducts(newInputValue);
-                                                        }
-                                                    }}
-                                                    renderInput={(params) => (
-                                                        <TextField
-                                                            {...params}
-                                                            label="Search Product"
-                                                            required={!selectedProduct}
-                                                            placeholder="Type to search (min 2 chars)..."
-                                                            InputProps={{
-                                                                ...params.InputProps,
-                                                                endAdornment: (
-                                                                    <React.Fragment>
-                                                                        {loading ? <CircularProgress color="inherit" size={20} /> : null}
-                                                                        {params.InputProps.endAdornment}
-                                                                    </React.Fragment>
-                                                                ),
-                                                            }}
-                                                        />
-                                                    )}
-                                                    renderOption={(props, option) => (
-                                                        <li {...props}>
-                                                            <Box>
-                                                                <Typography variant="body2">{option.name}</Typography>
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    Stock: {option.stock} | Price: {formatCurrency(option.price, settings.currency_symbol)}
-                                                                </Typography>
-                                                            </Box>
-                                                        </li>
-                                                    )}
-                                                />
-                                            </Grid>
-                                            {selectedProduct && (selectedProduct.selling_unit === 'both' || selectedProduct.selling_unit === 'box') && (
-                                                <Grid item xs={12}>
-                                                    <Typography variant="caption" color="text.secondary" gutterBottom>
-                                                        Selling Unit
-                                                    </Typography>
-                                                    <ToggleButtonGroup
-                                                        value={formData.selling_unit}
-                                                        exclusive
-                                                        onChange={handleUnitChange}
-                                                        fullWidth
-                                                        size="small"
-                                                        color="primary"
-                                                    >
-                                                        <ToggleButton value="item" disabled={selectedProduct.selling_unit === 'box'}>
-                                                            Item (Unit)
-                                                        </ToggleButton>
-                                                        <ToggleButton value="box" disabled={selectedProduct.selling_unit === 'item'}>
-                                                            Box ({selectedProduct.items_per_box} items)
-                                                        </ToggleButton>
-                                                    </ToggleButtonGroup>
-                                                </Grid>
-                                            )}
-                                            <Grid item xs={6}>
-                                                <TextField
-                                                    fullWidth
-                                                    required
-                                                    type="number"
-                                                    label={formData.selling_unit === 'box' ? 'Boxes' : 'Quantity'}
-                                                    name="quantity"
-                                                    value={formData.quantity}
-                                                    onChange={handleChange}
-                                                    inputProps={{ min: 1 }}
-                                                    helperText={
-                                                        formData.selling_unit === 'box' && selectedProduct
-                                                            ? `= ${parseInt(formData.quantity || 1) * (selectedProduct.items_per_box || 1)} items`
-                                                            : ''
-                                                    }
-                                                />
-                                            </Grid>
-                                            <Grid item xs={6}>
-                                                <TextField
-                                                    fullWidth
-                                                    required
-                                                    type="number"
-                                                    label="Price"
-                                                    name="price_at_sale"
-                                                    value={formData.price_at_sale}
-                                                    onChange={handleChange}
-                                                    inputProps={{ step: '0.01' }}
-                                                />
-                                            </Grid>
-                                            <Grid item xs={12}>
-                                                <Button
-                                                    type="submit"
-                                                    variant="contained"
-                                                    fullWidth
-                                                    size="large"
-                                                    startIcon={<Add />}
-                                                    disabled={!selectedProduct}
-                                                >
-                                                    Add to Cart
-                                                </Button>
-                                            </Grid>
-                                        </Grid>
-                                    </form>
-                                </CardContent>
-                            </Card>
-                        </Grid >
-
-                        {/* Right Side: Cart & Checkout */}
-                        < Grid item xs={12} md={6} >
-                            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                                <CardContent sx={{ flexGrow: 1 }}>
-                                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                                        <Typography variant="h6" fontWeight={600}>
-                                            Current Cart
-                                        </Typography>
-                                        <Chip label={`${cart.length} items`} color="primary" size="small" />
-                                    </Box>
-
-                                    <Box sx={{ maxHeight: 300, overflowY: 'auto', mb: 2 }}>
-                                        {cart.length === 0 ? (
-                                            <Typography color="text.secondary" align="center" py={4}>
-                                                Cart is empty
-                                            </Typography>
-                                        ) : (
-                                            cart.map((item, index) => (
-                                                <Box key={index} display="flex" justifyContent="space-between" alignItems="center" mb={1} p={1} bgcolor="background.default" borderRadius={1}>
-                                                    <Box>
-                                                        <Typography variant="body2" fontWeight={600}>{item.product.name}</Typography>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {item.quantity} x {formatCurrency(item.price, settings.currency_symbol)}
-                                                        </Typography>
-                                                    </Box>
-                                                    <Box display="flex" alignItems="center">
-                                                        <Typography variant="body2" fontWeight={600} mr={1}>
-                                                            {formatCurrency(item.total, settings.currency_symbol)}
-                                                        </Typography>
-                                                        <IconButton size="small" color="error" onClick={() => handleRemoveFromCart(index)}>
-                                                            <Delete fontSize="small" />
-                                                        </IconButton>
-                                                    </Box>
-                                                </Box>
-                                            ))
-                                        )}
-                                    </Box>
-
-                                    <Divider sx={{ my: 2 }} />
-
-                                    <Grid container spacing={2}>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                label="Discount"
-                                                name="discount"
-                                                type="number"
-                                                value={formData.discount}
-                                                onChange={handleChange}
-                                            />
-                                        </Grid>
-                                        <Grid item xs={6}>
-                                            <TextField
-                                                fullWidth
-                                                size="small"
-                                                select
-                                                label="Payment"
-                                                name="payment_method"
-                                                value={formData.payment_method}
-                                                onChange={handleChange}
-                                                SelectProps={{ native: true }}
-                                            >
-                                                <option value="cash">Cash</option>
-                                                <option value="card">Card</option>
-                                                <option value="online">Online</option>
-                                            </TextField>
-                                        </Grid>
-                                        <Grid item xs={12}>
-                                            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                                                <Typography variant="h6">Total:</Typography>
-                                                <Typography variant="h4" color="primary" fontWeight={700}>
-                                                    {formatCurrency(calculateCartTotal() - (parseFloat(formData.discount) || 0), settings.currency_symbol)}
-                                                </Typography>
-                                            </Box>
-                                            <Button
-                                                variant="contained"
-                                                color="success"
-                                                fullWidth
-                                                size="large"
-                                                onClick={handleCheckout}
-                                                disabled={cart.length === 0 || loading}
-                                            >
-                                                {loading ? 'Processing...' : 'Complete Sale'}
-                                            </Button>
-                                        </Grid>
+                {/* Right: Totals & Actions */}
+                <Grid item xs={12} md={4}>
+                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                        <CardContent>
+                            <Typography variant="h6" gutterBottom>Sale Summary</Typography>
+                            <Box my={2}>
+                                <Grid container spacing={2}>
+                                    <Grid item xs={6}>
+                                        <Typography color="text.secondary">Subtotal</Typography>
                                     </Grid>
-                                </CardContent>
-                            </Card>
-                        </Grid>
-                    </Grid>
+                                    <Grid item xs={6} textAlign="right">
+                                        <Typography variant="h6">
+                                            {formatCurrency(cart.reduce((s, i) => s + i.total, 0), settings.currency_symbol)}
+                                        </Typography>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            label="Discount (F9)"
+                                            fullWidth
+                                            size="small"
+                                            type="number"
+                                            value={globalDiscount}
+                                            onChange={e => setGlobalDiscount(e.target.value)}
+                                            inputRef={discountInputRef}
+                                        />
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <TextField
+                                            select
+                                            label="Payment Method"
+                                            fullWidth
+                                            size="small"
+                                            SelectProps={{ native: true }}
+                                            value={paymentMethod}
+                                            onChange={e => setPaymentMethod(e.target.value)}
+                                        >
+                                            <option value="cash">Cash</option>
+                                            <option value="card">Card</option>
+                                            <option value="online">Online</option>
+                                        </TextField>
+                                    </Grid>
+                                    <Grid item xs={12}>
+                                        <Divider sx={{ my: 1 }} />
+                                        <Box display="flex" justifyContent="space-between" alignItems="center">
+                                            <Typography variant="h5" fontWeight="bold">Total</Typography>
+                                            <Typography variant="h4" color="primary" fontWeight="bold">
+                                                {formatCurrency(calculateTotal(), settings.currency_symbol)}
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            </Box>
+
+                            <Button
+                                variant="contained"
+                                color="success"
+                                fullWidth
+                                size="large"
+                                startIcon={<ShoppingCart />}
+                                onClick={handleCheckout}
+                                disabled={cart.length === 0 || loading}
+                                ref={payButtonRef}
+                                sx={{ mt: 2, py: 2, fontSize: '1.2rem' }}
+                            >
+                                {loading ? 'Processing...' : 'Complete Sale (F4)'}
+                            </Button>
+                        </CardContent>
+                    </Card>
                 </Grid>
             </Grid>
+
+            {/* Help Dialog */}
+            <Dialog open={helpOpen} onClose={() => setHelpOpen(false)}>
+                <DialogTitle>Keyboard Shortcuts</DialogTitle>
+                <DialogContent>
+                    <Grid container spacing={2}>
+                        <Grid item xs={6}><Chip label="F2" size="small" /></Grid>
+                        <Grid item xs={6}><Typography>Focus Search Bar</Typography></Grid>
+
+                        <Grid item xs={6}><Chip label="F4" size="small" /></Grid>
+                        <Grid item xs={6}><Typography>Complete Sale / Pay</Typography></Grid>
+
+                        <Grid item xs={6}><Chip label="F9" size="small" /></Grid>
+                        <Grid item xs={6}><Typography>Focus Discount Field</Typography></Grid>
+
+                        <Grid item xs={6}><Chip label="F8" size="small" /></Grid>
+                        <Grid item xs={6}><Typography>Toggle Unit (Item/Box)</Typography></Grid>
+
+                        <Grid item xs={6}><Chip label="Esc" size="small" /></Grid>
+                        <Grid item xs={6}><Typography>Clear Selection / Blur</Typography></Grid>
+                    </Grid>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setHelpOpen(false)}>Close</Button>
+                </DialogActions>
+            </Dialog>
 
             <ReceiptModal
                 open={receiptModalOpen}

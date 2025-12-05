@@ -29,6 +29,11 @@ export const AuthProvider = ({ children }) => {
             setSession(session);
             setUser(session?.user ?? null);
             setLoading(false);
+        }).catch(err => {
+            console.error('Auth initialization error:', err);
+            setSession(null);
+            setUser(null);
+            setLoading(false);
         });
 
         // Listen for auth changes
