@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     Container,
@@ -26,7 +26,7 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../../supabaseClient';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
-import { formatDate, getExpiryStatus, getStockStatus, getDateDaysAgo } from '../../utils/dateHelpers';
+import { formatDate, getExpiryStatus } from '../../utils/dateHelpers';
 import useSettings from '../../hooks/useSettings';
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import { useKeyboard } from '../../contexts/KeyboardContext';
@@ -50,6 +50,62 @@ export default function Dashboard() {
     const [nearExpiryItems, setNearExpiryItems] = useState([]);
 
     // -- Keyboard Shortcuts --
+
+
+    const fetchDashboardData = useCallback(async () => {
+        setLoading(true);
+        try {
+            const expiryThreshold = parseInt(settings?.expiry_alert_days || '15');
+
+            // Parallelize the two main requests
+            const [statsResult, chartResult, topProductsResult, lowStockResult, nearExpiryResult] = await Promise.all([
+                supabase.rpc('get_dashboard_stats', { expiry_days_threshold: expiryThreshold }),
+                supabase.rpc('get_sales_chart_data', { days_back: 7 }),
+                supabase.rpc('get_top_products', { limit_count: 5, days_back: 30 }),
+                supabase.rpc('get_low_stock_products'),
+                supabase.rpc('get_near_expiry_products', { days_threshold: expiryThreshold })
+            ]);
+
+            // Process Stats
+            if (statsResult.data && statsResult.data.length > 0) {
+                const s = statsResult.data[0];
+                setStats({
+                    todaySales: s.today_sales_count,
+                    todayRevenue: s.today_revenue,
+                    lowStockCount: s.low_stock_count,
+                    nearExpiryCount: s.near_expiry_count,
+                    totalProducts: s.total_products_count,
+                    totalStock: s.total_stock_count,
+                });
+            } else if (statsResult.error) {
+                console.error('Error fetching dashboard stats:', statsResult.error);
+            }
+
+            // Process Chart
+            if (chartResult.data) {
+                const formattedChartData = chartResult.data.map(item => ({
+                    date: formatDate(item.sale_date, 'MMM dd'),
+                    revenue: item.daily_revenue
+                }));
+                // If RPC returns empty (no sales ever), basic check, but handled by generate_series in SQL usually
+                setSalesChart(formattedChartData);
+            } else if (chartResult.error) {
+                console.error('Error fetching sales chart:', chartResult.error);
+            }
+
+            // Process Lists
+            setTopProducts(topProductsResult.data || []);
+            setLowStockItems((lowStockResult.data || []).slice(0, 5));
+            setNearExpiryItems((nearExpiryResult.data || []).slice(0, 5));
+
+        } catch (error) {
+            console.error('Error in dashboard data fetch:', error);
+        } finally {
+            setLoading(false);
+        }
+    }, [settings]);
+
+    // -- Keyboard Shortcuts --
     useKeyboardShortcuts({
         'Alt+r': () => fetchDashboardData(),
         'Alt+n': () => navigate('/sales'),
@@ -59,7 +115,7 @@ export default function Dashboard() {
 
     useEffect(() => {
         fetchDashboardData();
-    }, [settings]);
+    }, [fetchDashboardData]);
 
     useEffect(() => {
         // Auto-refresh when window regains focus (user returns to dashboard)
@@ -74,106 +130,10 @@ export default function Dashboard() {
         return () => {
             window.removeEventListener('focus', handleFocus);
         };
-    }, [settings]);
+    }, [settings, fetchDashboardData]);
 
-    async function fetchDashboardData() {
-        setLoading(true);
-        try {
-            await Promise.all([
-                fetchTodayStats(),
-                fetchSalesChart(),
-                fetchTopProducts(),
-                fetchLowStockItems(),
-                fetchNearExpiryItems(),
-            ]);
-        } catch (error) {
-            console.error('Error fetching dashboard data:', error);
-        } finally {
-            setLoading(false);
-        }
-    }
+    // Individual fetch functions removed in favor of single optimized batchAbove
 
-    async function fetchTodayStats() {
-        const today = new Date().toISOString().split('T')[0];
-
-        // Today's sales
-        const { data: salesData } = await supabase
-            .from('sales')
-            .select('quantity, price_at_sale')
-            .eq('sale_date', today);
-
-        const todaySales = salesData?.length || 0;
-        const todayRevenue = salesData?.reduce((sum, sale) => sum + (sale.quantity * sale.price_at_sale), 0) || 0;
-
-        // Product stats
-        const { data: productsData } = await supabase
-            .from('products')
-            .select('stock, min_stock_level');
-
-        const totalProducts = productsData?.length || 0;
-        const totalStock = productsData?.reduce((sum, p) => sum + (p.stock || 0), 0) || 0;
-        const lowStockCount = productsData?.filter(p => p.stock <= (p.min_stock_level || 10)).length || 0;
-
-        // Near expiry count
-        const expiryThreshold = parseInt(settings?.expiry_alert_days || '15');
-        const { data: expiryData, error: expiryError } = await supabase.rpc('get_near_expiry_products', { days_threshold: expiryThreshold });
-        if (expiryError) {
-            console.error('Error fetching near expiry products:', expiryError);
-        }
-        const nearExpiryCount = expiryData?.length || 0;
-
-        setStats({
-            todaySales,
-            todayRevenue,
-            lowStockCount,
-            nearExpiryCount,
-            totalProducts,
-            totalStock,
-        });
-    }
-
-    async function fetchSalesChart() {
-        const chartData = [];
-        for (let i = 6; i >= 0; i--) {
-            const date = getDateDaysAgo(i);
-            const { data } = await supabase
-                .from('sales')
-                .select('quantity, price_at_sale')
-                .eq('sale_date', date);
-
-            const revenue = data?.reduce((sum, sale) => sum + (sale.quantity * sale.price_at_sale), 0) || 0;
-            chartData.push({
-                date: formatDate(date, 'MMM dd'),
-                revenue: revenue,
-            });
-        }
-        setSalesChart(chartData);
-    }
-
-    async function fetchTopProducts() {
-        const { data, error } = await supabase.rpc('get_top_products', { limit_count: 5, days_back: 30 });
-        if (error) {
-            console.error('Error fetching top products:', error);
-        }
-        setTopProducts(data || []);
-    }
-
-    async function fetchLowStockItems() {
-        const { data, error } = await supabase.rpc('get_low_stock_products');
-        if (error) {
-            console.error('Error fetching low stock items:', error);
-        }
-        setLowStockItems((data || []).slice(0, 5));
-    }
-
-    async function fetchNearExpiryItems() {
-        const expiryThreshold = parseInt(settings?.expiry_alert_days || '15');
-        const { data, error } = await supabase.rpc('get_near_expiry_products', { days_threshold: expiryThreshold });
-        if (error) {
-            console.error('Error fetching near expiry items:', error);
-        }
-        setNearExpiryItems((data || []).slice(0, 5));
-    }
 
     if (loading) {
         return (

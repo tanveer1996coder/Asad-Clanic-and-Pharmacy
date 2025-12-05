@@ -4,7 +4,12 @@
   --accent: #2563eb;
   --muted: #6b7280;
 }
-*{box-sizing:border-box}
+* { box-sizing: border-box; }
+/* Horizontal Scroll Wrapper utility */
+.table-responsive {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 body{font-family:Inter,Segoe UI,Arial,Helvetica,sans-serif;margin:0;background:var(--bg);color:#111}
 .app{display:flex;height:100vh;padding:16px;gap:16px}
 .sidebar{width:360px;display:flex;flex-direction:column;gap:16px}

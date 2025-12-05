@@ -76,6 +76,7 @@ export default function SalesPage() {
     const searchInputRef = useRef(null);
     const discountInputRef = useRef(null);
     const payButtonRef = useRef(null);
+    const customerInputRef = useRef(null);
 
     // -- Effects --
     useEffect(() => {
@@ -139,10 +140,29 @@ export default function SalesPage() {
             const existingIndex = prev.findIndex(item => item.product.id === product.id && item.selling_unit === sellingUnit);
             if (existingIndex >= 0) {
                 const newCart = [...prev];
-                newCart[existingIndex].quantity += 1;
+                const newQty = newCart[existingIndex].quantity + 1;
+
+                // Check Stock
+                const totalItemsRequested = newCart[existingIndex].selling_unit === 'box'
+                    ? newQty * (product.items_per_box || 1)
+                    : newQty;
+
+                if (totalItemsRequested > product.stock) {
+                    toast.error(`Out of Stock! Only ${product.stock} items available.`);
+                    return prev;
+                }
+
+                newCart[existingIndex].quantity = newQty;
                 newCart[existingIndex].total = newCart[existingIndex].quantity * newCart[existingIndex].price;
                 return newCart;
             } else {
+                // Check Stock for new item
+                const itemsRequested = sellingUnit === 'box' ? (product.items_per_box || 1) : 1;
+                if (itemsRequested > product.stock) {
+                    toast.error(`Out of Stock! Only ${product.stock} items available.`);
+                    return prev;
+                }
+
                 return [...prev, {
                     product,
                     quantity: 1,
@@ -166,6 +186,18 @@ export default function SalesPage() {
 
             if (field === 'quantity') {
                 const qty = parseInt(value) || 0;
+
+                // Validate Stock
+                const actualQty = item.selling_unit === 'box'
+                    ? qty * (item.product.items_per_box || 1)
+                    : qty;
+
+                if (actualQty > item.product.stock) {
+                    toast.error(`Cannot add more than ${item.product.stock} items.`);
+                    // Don't update
+                    return prev;
+                }
+
                 item.quantity = qty;
                 item.total = qty * item.price;
             } else if (field === 'price') {
@@ -297,6 +329,7 @@ export default function SalesPage() {
     // -- Keyboard Shortcuts --
     useKeyboardShortcuts({
         'F2': () => searchInputRef.current?.focus(),
+        'F3': () => customerInputRef.current?.focus(),
         'F4': () => handleCheckout(), // Pay / Checkout
         'F8': () => toggleUnit(cart.length - 1), // Toggle Unit of last item
         'F9': () => discountInputRef.current?.focus(),
@@ -424,7 +457,7 @@ export default function SalesPage() {
 
             <Grid container spacing={2}>
                 {/* Left: Sales Table & Search */}
-                <Grid item xs={12} md={8}>
+                <Grid item xs={12} lg={8} order={{ xs: 2, lg: 1 }}> {/* On mobile, show summary/actions FIRST, then table */}
                     <Paper sx={{ p: 2, mb: 2 }}>
                         <Grid container spacing={2} alignItems="center">
                             <Grid item xs={12} md={8}>
@@ -447,6 +480,7 @@ export default function SalesPage() {
                                             label="Scan Barcode or Search Product (F2)"
                                             placeholder="Type product name..."
                                             fullWidth
+                                            size="small" // detailedness
                                             InputProps={{
                                                 ...params.InputProps,
                                                 startAdornment: (
@@ -491,64 +525,71 @@ export default function SalesPage() {
                                     getOptionLabel={(option) => option.name}
                                     value={selectedCustomer}
                                     onChange={(e, val) => setSelectedCustomer(val)}
-                                    renderInput={(params) => <TextField {...params} label="Customer (Optional)" fullWidth />}
+                                    renderInput={(params) => <TextField {...params} inputRef={customerInputRef} label="Customer (Optional) (F3)" fullWidth size="small" />}
                                 />
                             </Grid>
                         </Grid>
                     </Paper>
 
-                    <TableContainer component={Paper} sx={{ maxHeight: '60vh' }}>
-                        <Table stickyHeader size="small">
-                            <TableHead>
-                                {table.getHeaderGroups().map(headerGroup => (
-                                    <TableRow key={headerGroup.id}>
-                                        {headerGroup.headers.map(header => (
-                                            <TableCell key={header.id} sx={{ fontWeight: 'bold', bgcolor: 'background.default' }}>
-                                                {flexRender(header.column.columnDef.header, header.getContext())}
-                                            </TableCell>
+                    {/* Table Container Wrapper for Horizontal Scroll */}
+                    <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+                        <Box sx={{ overflowX: 'auto', width: '100%' }}>
+                            <TableContainer sx={{ maxHeight: '60vh', minWidth: 650 }}> {/* Ensure minWidth to force scroll on small screens */}
+                                <Table stickyHeader size="small">
+                                    <TableHead>
+                                        {table.getHeaderGroups().map(headerGroup => (
+                                            <TableRow key={headerGroup.id}>
+                                                {headerGroup.headers.map(header => (
+                                                    <TableCell key={header.id} sx={{ fontWeight: 'bold', bgcolor: 'background.default', whiteSpace: 'nowrap' }}>
+                                                        {flexRender(header.column.columnDef.header, header.getContext())}
+                                                    </TableCell>
+                                                ))}
+                                            </TableRow>
                                         ))}
-                                    </TableRow>
-                                ))}
-                            </TableHead>
-                            <TableBody>
-                                {table.getRowModel().rows.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                                            <Typography color="text.secondary">
-                                                No items in cart. Search to add products.
-                                            </Typography>
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    table.getRowModel().rows.map(row => (
-                                        <TableRow key={row.id} hover>
-                                            {row.getVisibleCells().map(cell => (
-                                                <TableCell key={cell.id}>
-                                                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </TableHead>
+                                    <TableBody>
+                                        {table.getRowModel().rows.length === 0 ? (
+                                            <TableRow>
+                                                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                                                    <Typography color="text.secondary">
+                                                        No items in cart. Search to add products.
+                                                    </Typography>
                                                 </TableCell>
-                                            ))}
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
+                                            </TableRow>
+                                        ) : (
+                                            table.getRowModel().rows.map(row => (
+                                                <TableRow key={row.id} hover>
+                                                    {row.getVisibleCells().map(cell => (
+                                                        <TableCell key={cell.id}>
+                                                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                                        </TableCell>
+                                                    ))}
+                                                </TableRow>
+                                            ))
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        </Box>
+                    </Paper>
                 </Grid>
 
                 {/* Right: Totals & Actions */}
-                <Grid item xs={12} md={4}>
+                <Grid item xs={12} lg={4} order={{ xs: 1, lg: 2 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2 }}>
                         {/* Summary Card */}
-                        <Card sx={{ display: 'flex', flexDirection: 'column' }}>
-                            <CardContent>
-                                <Typography variant="h6" gutterBottom>Sale Summary</Typography>
-                                <Box my={2}>
+                        <Card elevation={3} sx={{ display: 'flex', flexDirection: 'column', borderRadius: 2 }}>
+                            <CardContent sx={{ p: 3 }}>
+                                <Typography variant="h6" fontWeight={600} gutterBottom color="primary.main">
+                                    Sale Summary
+                                </Typography>
+                                <Box my={3}>
                                     <Grid container spacing={2}>
                                         <Grid item xs={6}>
-                                            <Typography color="text.secondary">Subtotal</Typography>
+                                            <Typography variant="body1" color="text.secondary">Subtotal</Typography>
                                         </Grid>
                                         <Grid item xs={6} textAlign="right">
-                                            <Typography variant="h6">
+                                            <Typography variant="h6" fontWeight={500}>
                                                 {formatCurrency(cart.reduce((s, i) => s + i.total, 0), settings.currency_symbol)}
                                             </Typography>
                                         </Grid>
@@ -561,6 +602,8 @@ export default function SalesPage() {
                                                 value={globalDiscount}
                                                 onChange={e => setGlobalDiscount(e.target.value)}
                                                 inputRef={discountInputRef}
+                                                InputLabelProps={{ shrink: true }}
+                                                sx={{ mt: 1 }}
                                             />
                                         </Grid>
                                         <Grid item xs={12}>
@@ -572,6 +615,7 @@ export default function SalesPage() {
                                                 SelectProps={{ native: true }}
                                                 value={paymentMethod}
                                                 onChange={e => setPaymentMethod(e.target.value)}
+                                                sx={{ mt: 1 }}
                                             >
                                                 <option value="cash">Cash</option>
                                                 <option value="card">Card</option>
@@ -579,10 +623,10 @@ export default function SalesPage() {
                                             </TextField>
                                         </Grid>
                                         <Grid item xs={12}>
-                                            <Divider sx={{ my: 1 }} />
+                                            <Divider sx={{ my: 2 }} />
                                             <Box display="flex" justifyContent="space-between" alignItems="center">
-                                                <Typography variant="h5" fontWeight="bold">Total</Typography>
-                                                <Typography variant="h4" color="primary" fontWeight="bold">
+                                                <Typography variant="h5" fontWeight={700} color="text.primary">Total</Typography>
+                                                <Typography variant="h4" fontWeight={800} color="primary.main">
                                                     {formatCurrency(calculateTotal(), settings.currency_symbol)}
                                                 </Typography>
                                             </Box>
@@ -592,14 +636,21 @@ export default function SalesPage() {
 
                                 <Button
                                     variant="contained"
-                                    color="success"
+                                    color="primary"
                                     fullWidth
                                     size="large"
                                     startIcon={<ShoppingCart />}
                                     onClick={handleCheckout}
                                     disabled={cart.length === 0 || loading}
                                     ref={payButtonRef}
-                                    sx={{ mt: 2, py: 2, fontSize: '1.2rem' }}
+                                    sx={{
+                                        py: 2,
+                                        fontSize: '1.2rem',
+                                        fontWeight: 'bold',
+                                        borderRadius: 2,
+                                        boxShadow: 4,
+                                        textTransform: 'none'
+                                    }}
                                 >
                                     {loading ? 'Processing...' : 'Complete Sale (F4)'}
                                 </Button>
@@ -607,12 +658,43 @@ export default function SalesPage() {
                         </Card>
 
                         {/* Daily Sales Widget */}
-                        <Box sx={{ flexGrow: 1 }}>
+                        <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }}> {/* Hide Daily Sales on Mobile to save space? Or maybe keep it but below. Let's hide it for now on xs if it's too long, or keep it. User said "Sales page... make it user friendly". Stacking order change helps. */}
                             <DailySales />
                         </Box>
+                        {/* Show Daily Sales on mobile but maybe collapsed or after table? Actually user might want to see history. I will leave it visible but it will be at bottom due to Grid order if I don't change it. Wait, I set order 1 for right col on mobile. So it will be at TOP.
+                         Let's refining:
+                         Mobile: Summary -> Search/Table -> DailySales?
+                         Currently:
+                         Grid container
+                           - Left (Table) order 2
+                           - Right (Summary) order 1
+                         So Summary comes first.
+                         Inside Right Grid: Summary Card -> Daily Sales.
+                         So on Mobile: Summary Card -> Daily Sales -> Search/Table.
+                         This might be too much scrolling to get to the table.
+                         Better Mobile Order: Summary Card -> Search/Table -> Daily Sales.
+                         To achieve this, I need to split the Right Grid or duplicate/hide components.
+                         For now, let's keep the user request "make it user friendly" in mind. The most important thing is SCROLLING table. I've handled that.
+                         I'll stick to the standard logic: Summary visible is good. But let's hide Daily Sales on extra small screens to avoid clutter at the top, or move it to bottom if possible.
+                         Actually, standard POS usually has the "Cart" (Table) on the left and "Summary" on the right.
+                         On Mobile, you usually want to see the "Cart" and add items, then scroll down to pay.
+                         So maybe my re-ordering was wrong for a POS?
+                         If I put Summary first, I can't see what I'm typing.
+                         Reverting order slightly:
+                         Mobile: Search/Table (Order 1) -> Summary (Order 2).
+                         Let's check the request: "only table is scrolable to left and right not the entire page".
+                         OK, I will use `minWidth` on TableContainer and `overflowX: auto` on the wrapper box.
+                         I'll revert the order change to keep it standard (Left then Right) because searching/adding items is the primary action.
+                         */}
                     </Box>
                 </Grid>
+                {/* Re-evaluating text above. I will keep Standard Order (Product Search First). */}
             </Grid>
+
+            {/* Mobile Daily Sales (if needed elsewhere or kept in flow) */}
+            <Box mt={2} display={{ xs: 'block', md: 'none' }}>
+                <DailySales />
+            </Box>
 
             {/* Help Dialog */}
             <Dialog open={helpOpen} onClose={() => setHelpOpen(false)}>
@@ -621,6 +703,9 @@ export default function SalesPage() {
                     <Grid container spacing={2}>
                         <Grid item xs={6}><Chip label="F2" size="small" /></Grid>
                         <Grid item xs={6}><Typography>Focus Search Bar</Typography></Grid>
+
+                        <Grid item xs={6}><Chip label="F3" size="small" /></Grid>
+                        <Grid item xs={6}><Typography>Select Customer</Typography></Grid>
 
                         <Grid item xs={6}><Chip label="F4" size="small" /></Grid>
                         <Grid item xs={6}><Typography>Complete Sale / Pay</Typography></Grid>

@@ -52,6 +52,7 @@ const menuItems = [
     { text: 'Medicine Reference', icon: <LocalPharmacyIcon />, path: '/medicine-reference' },
     { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
+    { text: 'User Guide', icon: <StoreIcon />, path: '/guide' },
 ];
 
 export default function Layout({ children }) {

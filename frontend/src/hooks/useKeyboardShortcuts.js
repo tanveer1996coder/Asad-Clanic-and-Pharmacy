@@ -12,17 +12,20 @@ import { useKeyboard } from '../contexts/KeyboardContext';
  */
 const useKeyboardShortcuts = (keyMap, section = 'Global', enabled = true) => {
     const { registerShortcut, unregisterShortcut } = useKeyboard();
-    // Keep track of registered keys to cleanup on unmount/change
-    const registeredKeysRef = useRef([]);
+
+    // Use refs to access latest values in event handler without triggering re-renders
+    const keyMapRef = useRef(keyMap);
+
+    // Update ref when keyMap changes
+    useEffect(() => {
+        keyMapRef.current = keyMap;
+    }, [keyMap]);
 
     const handleKeyDown = useCallback(
         (event) => {
             if (!enabled) return;
 
-            // Ignore if inside an input/textarea unless it's a special command (like Alt/Ctrl)
-            // But usually we want global nav to work everywhere.
-            // For now, let's allow it everywhere, but specific pages might want to block it.
-
+            const map = keyMapRef.current;
             const { key, ctrlKey, shiftKey, altKey, metaKey } = event;
 
             // Construct the key string
@@ -42,12 +45,12 @@ const useKeyboardShortcuts = (keyMap, section = 'Global', enabled = true) => {
             let handler = null;
 
             // 1. Check exact combo
-            if (keyMap[combo]) {
-                handler = keyMap[combo];
+            if (map[combo]) {
+                handler = map[combo];
             }
             // 2. Check simple key if no modifiers (fallback)
-            else if (keyMap[key] && modifiers.length <= 1 && modifiers[0] === key) {
-                handler = keyMap[key];
+            else if (map[key] && modifiers.length <= 1 && modifiers[0] === key) {
+                handler = map[key];
             }
 
             if (handler) {
@@ -58,10 +61,13 @@ const useKeyboardShortcuts = (keyMap, section = 'Global', enabled = true) => {
                 }
             }
         },
-        [keyMap, enabled]
+        [enabled]
     );
 
     // Register shortcuts with Context for Help Modal
+    // Prevent infinite loop by serializing keys
+    const shortcutKeys = JSON.stringify(Object.keys(keyMap));
+
     useEffect(() => {
         if (!enabled) return;
 
@@ -76,12 +82,10 @@ const useKeyboardShortcuts = (keyMap, section = 'Global', enabled = true) => {
             newRegisteredKeys.push(id);
         });
 
-        registeredKeysRef.current = newRegisteredKeys;
-
         return () => {
             newRegisteredKeys.forEach(id => unregisterShortcut(id));
         };
-    }, [keyMap, section, enabled, registerShortcut, unregisterShortcut]);
+    }, [shortcutKeys, section, enabled, registerShortcut, unregisterShortcut]);
 
     // Attach actual event listener
     useEffect(() => {
