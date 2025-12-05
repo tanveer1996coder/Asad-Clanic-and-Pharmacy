@@ -31,9 +31,12 @@ import {
     Store as StoreIcon,
     Logout as LogoutIcon,
     LocalPharmacy as LocalPharmacyIcon,
+    Keyboard as KeyboardIcon,
 } from '@mui/icons-material';
 import useSettings from '../../hooks/useSettings';
 import { useAuth } from '../../contexts/AuthContext';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 const drawerWidth = 260;
 
@@ -60,6 +63,17 @@ export default function Layout({ children }) {
     const location = useLocation();
     const { settings } = useSettings();
     const { signOut, user } = useAuth();
+    const { toggleHelp } = useKeyboard();
+
+    // Global Navigation Shortcuts
+    useKeyboardShortcuts({
+        'Alt+1': { action: () => navigate('/dashboard'), description: 'Go to Dashboard' },
+        'Alt+2': { action: () => navigate('/sales'), description: 'Go to Sales' },
+        'Alt+3': { action: () => navigate('/products'), description: 'Go to Products' },
+        'Alt+4': { action: () => navigate('/stock'), description: 'Go to Stock' },
+        'Alt+5': { action: () => navigate('/customers'), description: 'Go to Customers' },
+        'Shift+?': { action: toggleHelp, description: 'Show Keyboard Shortcuts' }
+    }, 'Global Navigation');
 
     const handleDrawerToggle = () => {
         setMobileOpen(!mobileOpen);
@@ -192,6 +206,10 @@ export default function Layout({ children }) {
                         <MenuItem onClick={() => { handleProfileMenuClose(); navigate('/settings'); }}>
                             <SettingsIcon sx={{ mr: 1 }} fontSize="small" />
                             Settings
+                        </MenuItem>
+                        <MenuItem onClick={() => { handleProfileMenuClose(); toggleHelp(); }}>
+                            <KeyboardIcon sx={{ mr: 1 }} fontSize="small" />
+                            Keyboard Shortcuts
                         </MenuItem>
                         <Divider />
                         <MenuItem onClick={() => { handleProfileMenuClose(); handleLogout(); }}>

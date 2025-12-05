@@ -11,6 +11,7 @@ import {
     Chip,
     IconButton,
     Tooltip,
+    Button,
 } from '@mui/material';
 import {
     TrendingUp,
@@ -20,15 +21,19 @@ import {
     AttachMoney,
     ShoppingCart,
     Refresh,
+    Keyboard
 } from '@mui/icons-material';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 import { supabase } from '../../supabaseClient';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { formatDate, getExpiryStatus, getStockStatus, getDateDaysAgo } from '../../utils/dateHelpers';
 import useSettings from '../../hooks/useSettings';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function Dashboard() {
     const { settings } = useSettings();
+    const { toggleHelp } = useKeyboard();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [stats, setStats] = useState({
@@ -43,6 +48,14 @@ export default function Dashboard() {
     const [topProducts, setTopProducts] = useState([]);
     const [lowStockItems, setLowStockItems] = useState([]);
     const [nearExpiryItems, setNearExpiryItems] = useState([]);
+
+    // -- Keyboard Shortcuts --
+    useKeyboardShortcuts({
+        'Alt+r': () => fetchDashboardData(),
+        'Alt+n': () => navigate('/sales'),
+        'Alt+p': () => navigate('/products'),
+        'Shift+?': () => { /* Help handled globally, but good to document/allow override */ }
+    }, 'Dashboard');
 
     useEffect(() => {
         fetchDashboardData();
@@ -183,11 +196,21 @@ export default function Dashboard() {
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Dashboard
                 </Typography>
-                <Tooltip title="Refresh">
-                    <IconButton onClick={fetchDashboardData} color="primary">
-                        <Refresh />
-                    </IconButton>
-                </Tooltip>
+                <Box display="flex" gap={1}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Keyboard />}
+                        onClick={toggleHelp}
+                        size="small"
+                    >
+                        Shortcuts
+                    </Button>
+                    <Tooltip title="Refresh (Alt+r)">
+                        <IconButton onClick={fetchDashboardData} color="primary">
+                            <Refresh />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
             </Box>
 
             {/* Stats Cards */}

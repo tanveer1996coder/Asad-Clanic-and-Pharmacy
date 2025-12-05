@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Container,
     Card,
@@ -33,6 +33,7 @@ import {
     LocalShipping,
     PendingActions,
     Delete,
+    Keyboard,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
@@ -41,9 +42,12 @@ import CreateEditPODialog from './CreateEditPODialog';
 import PODetailDialog from './PODetailDialog';
 import POReceiptModal from './POReceiptModal';
 import useSettings from '../../hooks/useSettings';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function PurchaseOrdersPage() {
     const { settings } = useSettings();
+    const { toggleHelp } = useKeyboard();
     const theme = useTheme();
     const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
@@ -67,6 +71,13 @@ export default function PurchaseOrdersPage() {
     const [selectedPO, setSelectedPO] = useState(null);
     const [receiptModalOpen, setReceiptModalOpen] = useState(false);
     const [receiptData, setReceiptData] = useState({ po: null, items: [], supplier: null });
+
+    const searchInputRef = useRef(null);
+
+    useKeyboardShortcuts({
+        'Alt+n': () => handleCreateNew(),
+        'Alt+f': () => searchInputRef.current?.focus(),
+    }, 'Purchase Orders Page');
 
     useEffect(() => {
         fetchPurchaseOrders();
@@ -249,14 +260,24 @@ export default function PurchaseOrdersPage() {
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Purchase Orders
                 </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={handleCreateNew}
-                    fullWidth={isMobile}
-                >
-                    New Purchase Order
-                </Button>
+                <Box display="flex" gap={1}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Keyboard />}
+                        onClick={toggleHelp}
+                        size={isMobile ? 'small' : 'medium'}
+                    >
+                        Shortcuts
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={handleCreateNew}
+                        fullWidth={isMobile}
+                    >
+                        New Purchase Order (Alt+n)
+                    </Button>
+                </Box>
             </Box>
 
             {/* Filters */}
@@ -264,7 +285,8 @@ export default function PurchaseOrdersPage() {
                 <CardContent>
                     <Box display="flex" gap={2} flexWrap="wrap">
                         <TextField
-                            label="Search PO"
+                            label="Search PO (Alt+f)"
+                            inputRef={searchInputRef}
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             size="small"

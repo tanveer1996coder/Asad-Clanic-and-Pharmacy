@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Container,
     Card,
@@ -32,14 +32,17 @@ import {
     InputAdornment,
     TablePagination,
 } from '@mui/material';
-import { Add, Edit, Delete, WhatsApp, Star, StarBorder, Search } from '@mui/icons-material';
+import { Add, Edit, Delete, WhatsApp, Star, StarBorder, Search, Keyboard } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
 import useSettings from '../../hooks/useSettings';
 import ConfirmDialog from '../shared/ConfirmDialog';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function SuppliersPage() {
     const { settings } = useSettings();
+    const { toggleHelp } = useKeyboard();
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -61,6 +64,13 @@ export default function SuppliersPage() {
         portfolio_link: '',
         notes: '',
     });
+
+    const searchInputRef = useRef(null);
+
+    useKeyboardShortcuts({
+        'Alt+n': () => handleOpenDialog(),
+        'Alt+f': () => searchInputRef.current?.focus(),
+    }, 'Suppliers Page');
 
     // Fetch suppliers with their primary contact
     const fetchSuppliers = async () => {
@@ -349,23 +359,33 @@ export default function SuppliersPage() {
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Suppliers
                 </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => handleOpenDialog()}
-                    fullWidth={isMobile}
-                >
-
-                    Add Supplier
-                </Button>
+                <Box display="flex" gap={1}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Keyboard />}
+                        onClick={toggleHelp}
+                        size={isMobile ? 'small' : 'medium'}
+                    >
+                        Shortcuts
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={() => handleOpenDialog()}
+                        fullWidth={isMobile}
+                    >
+                        Add Supplier (Alt+n)
+                    </Button>
+                </Box>
             </Box>
 
             <Card sx={{ mb: 3 }}>
                 <CardContent>
                     <TextField
                         fullWidth
+                        inputRef={searchInputRef}
                         size="small"
-                        placeholder="Search suppliers by name or email..."
+                        placeholder="Search suppliers by name or email... (Alt+f)"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         InputProps={{

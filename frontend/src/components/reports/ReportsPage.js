@@ -19,7 +19,7 @@ import {
     Tab,
     Chip,
 } from '@mui/material';
-import { Download, TrendingUp, Warning, AttachMoney } from '@mui/icons-material';
+import { Download, TrendingUp, Warning, AttachMoney, Keyboard } from '@mui/icons-material';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
@@ -27,9 +27,12 @@ import { formatCurrency, formatNumber, formatPercentage, getChartColor } from '.
 import { formatDate, getExpiryStatus, getDateDaysAgo } from '../../utils/dateHelpers';
 import useSettings from '../../hooks/useSettings';
 import Papa from 'papaparse';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function ReportsPage() {
     const { settings } = useSettings();
+    const { toggleHelp } = useKeyboard();
     const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState(0);
     const [dateRange, setDateRange] = useState({
@@ -42,6 +45,13 @@ export default function ReportsPage() {
     const [expiryReport, setExpiryReport] = useState([]);
     const [lowStockReport, setLowStockReport] = useState([]);
     const [topProducts, setTopProducts] = useState([]);
+
+    useKeyboardShortcuts({
+        'Alt+e': () => handleExport(),
+        'Alt+1': () => setActiveTab(0),
+        'Alt+2': () => setActiveTab(1),
+        'Alt+3': () => setActiveTab(2),
+    }, 'Reports Page');
 
     // Set initial tab from URL query parameter
     useEffect(() => {
@@ -173,9 +183,18 @@ export default function ReportsPage() {
 
     return (
         <Container maxWidth="xl">
-            <Typography variant="h4" fontWeight={700} color="primary" mb={3}>
-                Reports & Analytics
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                <Typography variant="h4" fontWeight={700} color="primary">
+                    Reports & Analytics
+                </Typography>
+                <Button
+                    variant="outlined"
+                    startIcon={<Keyboard />}
+                    onClick={toggleHelp}
+                >
+                    Shortcuts
+                </Button>
+            </Box>
 
             {/* Date Range Selector */}
             <Card sx={{ mb: 3 }}>

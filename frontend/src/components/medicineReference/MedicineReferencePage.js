@@ -41,13 +41,17 @@ import {
     Warning,
     CloudUpload,
     Download,
+    Keyboard,
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import Papa from 'papaparse';
 import { supabase } from '../../supabaseClient';
 import ConfirmDialog from '../shared/ConfirmDialog';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function MedicineReferencePage() {
+    const { toggleHelp } = useKeyboard();
     const [medicines, setMedicines] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -65,6 +69,12 @@ export default function MedicineReferencePage() {
     const [importing, setImporting] = useState(false);
     const [importProgress, setImportProgress] = useState(0);
     const fileInputRef = useRef(null);
+    const searchInputRef = useRef(null);
+
+    useKeyboardShortcuts({
+        'Alt+n': () => handleOpenDialog(),
+        'Alt+f': () => searchInputRef.current?.focus(),
+    }, 'Medicine Reference Page');
 
     const [formData, setFormData] = useState({
         generic_name: '',
@@ -423,12 +433,20 @@ export default function MedicineReferencePage() {
                         {importing ? 'Importing...' : 'Import CSV'}
                     </Button>
                     <Button
+                        variant="outlined"
+                        startIcon={<Keyboard />}
+                        onClick={toggleHelp}
+                        size={isMobile ? 'small' : 'medium'}
+                    >
+                        Shortcuts
+                    </Button>
+                    <Button
                         variant="contained"
                         startIcon={<Add />}
                         onClick={() => handleOpenDialog()}
                         size={isMobile ? 'small' : 'medium'}
                     >
-                        Add Medicine
+                        Add Medicine (Alt+n)
                     </Button>
                 </Box>
             </Box>
@@ -448,7 +466,8 @@ export default function MedicineReferencePage() {
                         <Grid item xs={12} md={6}>
                             <TextField
                                 fullWidth
-                                placeholder="Search by brand, generic name, formula, or manufacturer..."
+                                inputRef={searchInputRef}
+                                placeholder="Search by brand, generic name, formula, or manufacturer... (Alt+f)"
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 InputProps={{

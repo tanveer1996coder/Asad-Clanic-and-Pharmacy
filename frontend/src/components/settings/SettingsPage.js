@@ -28,13 +28,17 @@ import {
     SupportAgent,
     Email,
     Phone,
-    WhatsApp
+    WhatsApp,
+    Keyboard
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import useSettings from '../../hooks/useSettings';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function SettingsPage() {
     const { settings, loading, updateSettings } = useSettings();
+    const { toggleHelp } = useKeyboard();
     const [formData, setFormData] = useState({
         store_name: '',
         owner_name: '',
@@ -49,6 +53,13 @@ export default function SettingsPage() {
     const [saving, setSaving] = useState(false);
     const [logoPreview, setLogoPreview] = useState(null);
     const [activeTab, setActiveTab] = useState(0);
+
+    useKeyboardShortcuts({
+        'Alt+s': (e) => {
+            e.preventDefault();
+            handleSubmit(e);
+        },
+    }, 'Settings Page');
 
     const handleTabChange = (event, newValue) => {
         setActiveTab(newValue);
@@ -139,9 +150,18 @@ export default function SettingsPage() {
 
     return (
         <Container maxWidth="md">
-            <Typography variant="h4" fontWeight={700} color="primary" gutterBottom>
-                Settings
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+                <Typography variant="h4" fontWeight={700} color="primary">
+                    Settings
+                </Typography>
+                <Button
+                    variant="outlined"
+                    startIcon={<Keyboard />}
+                    onClick={toggleHelp}
+                >
+                    Shortcuts
+                </Button>
+            </Box>
 
             <Paper sx={{ mb: 3 }}>
                 <Tabs value={activeTab} onChange={handleTabChange} indicatorColor="primary" textColor="primary" variant="fullWidth">

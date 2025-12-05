@@ -537,72 +537,80 @@ export default function SalesPage() {
 
                 {/* Right: Totals & Actions */}
                 <Grid item xs={12} md={4}>
-                    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                        <CardContent>
-                            <Typography variant="h6" gutterBottom>Sale Summary</Typography>
-                            <Box my={2}>
-                                <Grid container spacing={2}>
-                                    <Grid item xs={6}>
-                                        <Typography color="text.secondary">Subtotal</Typography>
-                                    </Grid>
-                                    <Grid item xs={6} textAlign="right">
-                                        <Typography variant="h6">
-                                            {formatCurrency(cart.reduce((s, i) => s + i.total, 0), settings.currency_symbol)}
-                                        </Typography>
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            label="Discount (F9)"
-                                            fullWidth
-                                            size="small"
-                                            type="number"
-                                            value={globalDiscount}
-                                            onChange={e => setGlobalDiscount(e.target.value)}
-                                            inputRef={discountInputRef}
-                                        />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <TextField
-                                            select
-                                            label="Payment Method"
-                                            fullWidth
-                                            size="small"
-                                            SelectProps={{ native: true }}
-                                            value={paymentMethod}
-                                            onChange={e => setPaymentMethod(e.target.value)}
-                                        >
-                                            <option value="cash">Cash</option>
-                                            <option value="card">Card</option>
-                                            <option value="online">Online</option>
-                                        </TextField>
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                        <Divider sx={{ my: 1 }} />
-                                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                                            <Typography variant="h5" fontWeight="bold">Total</Typography>
-                                            <Typography variant="h4" color="primary" fontWeight="bold">
-                                                {formatCurrency(calculateTotal(), settings.currency_symbol)}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2 }}>
+                        {/* Summary Card */}
+                        <Card sx={{ display: 'flex', flexDirection: 'column' }}>
+                            <CardContent>
+                                <Typography variant="h6" gutterBottom>Sale Summary</Typography>
+                                <Box my={2}>
+                                    <Grid container spacing={2}>
+                                        <Grid item xs={6}>
+                                            <Typography color="text.secondary">Subtotal</Typography>
+                                        </Grid>
+                                        <Grid item xs={6} textAlign="right">
+                                            <Typography variant="h6">
+                                                {formatCurrency(cart.reduce((s, i) => s + i.total, 0), settings.currency_symbol)}
                                             </Typography>
-                                        </Box>
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                label="Discount (F9)"
+                                                fullWidth
+                                                size="small"
+                                                type="number"
+                                                value={globalDiscount}
+                                                onChange={e => setGlobalDiscount(e.target.value)}
+                                                inputRef={discountInputRef}
+                                            />
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <TextField
+                                                select
+                                                label="Payment Method"
+                                                fullWidth
+                                                size="small"
+                                                SelectProps={{ native: true }}
+                                                value={paymentMethod}
+                                                onChange={e => setPaymentMethod(e.target.value)}
+                                            >
+                                                <option value="cash">Cash</option>
+                                                <option value="card">Card</option>
+                                                <option value="online">Online</option>
+                                            </TextField>
+                                        </Grid>
+                                        <Grid item xs={12}>
+                                            <Divider sx={{ my: 1 }} />
+                                            <Box display="flex" justifyContent="space-between" alignItems="center">
+                                                <Typography variant="h5" fontWeight="bold">Total</Typography>
+                                                <Typography variant="h4" color="primary" fontWeight="bold">
+                                                    {formatCurrency(calculateTotal(), settings.currency_symbol)}
+                                                </Typography>
+                                            </Box>
+                                        </Grid>
                                     </Grid>
-                                </Grid>
-                            </Box>
+                                </Box>
 
-                            <Button
-                                variant="contained"
-                                color="success"
-                                fullWidth
-                                size="large"
-                                startIcon={<ShoppingCart />}
-                                onClick={handleCheckout}
-                                disabled={cart.length === 0 || loading}
-                                ref={payButtonRef}
-                                sx={{ mt: 2, py: 2, fontSize: '1.2rem' }}
-                            >
-                                {loading ? 'Processing...' : 'Complete Sale (F4)'}
-                            </Button>
-                        </CardContent>
-                    </Card>
+                                <Button
+                                    variant="contained"
+                                    color="success"
+                                    fullWidth
+                                    size="large"
+                                    startIcon={<ShoppingCart />}
+                                    onClick={handleCheckout}
+                                    disabled={cart.length === 0 || loading}
+                                    ref={payButtonRef}
+                                    sx={{ mt: 2, py: 2, fontSize: '1.2rem' }}
+                                >
+                                    {loading ? 'Processing...' : 'Complete Sale (F4)'}
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        {/* Daily Sales Widget */}
+                        <Box sx={{ flexGrow: 1 }}>
+                            <DailySales />
+                        </Box>
+                    </Box>
                 </Grid>
             </Grid>
 

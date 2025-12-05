@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Container,
     Card,
@@ -27,16 +27,19 @@ import {
     TablePagination,
     InputAdornment,
 } from '@mui/material';
-import { Add, Edit, Delete, History, Print, ShoppingCart, Repeat, Search } from '@mui/icons-material';
+import { Add, Edit, Delete, History, Print, ShoppingCart, Repeat, Search, Keyboard } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
 import useSettings from '../../hooks/useSettings';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import ReceiptModal from '../shared/ReceiptModal';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function CustomersPage() {
     const { settings } = useSettings();
+    const { toggleHelp } = useKeyboard();
     const [customers, setCustomers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -58,6 +61,13 @@ export default function CustomersPage() {
         address: '',
         notes: '',
     });
+
+    const searchInputRef = useRef(null);
+
+    useKeyboardShortcuts({
+        'Alt+n': () => handleOpenDialog(),
+        'Alt+f': () => searchInputRef.current?.focus(),
+    }, 'Customers Page');
 
     useEffect(() => {
         const delayDebounceFn = setTimeout(() => {
@@ -219,14 +229,24 @@ export default function CustomersPage() {
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Customers
                 </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => handleOpenDialog()}
-                    fullWidth={isMobile}
-                >
-                    Add Customer
-                </Button>
+                <Box display="flex" gap={1}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Keyboard />}
+                        onClick={toggleHelp}
+                        size={isMobile ? 'small' : 'medium'}
+                    >
+                        Shortcuts
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={() => handleOpenDialog()}
+                        fullWidth={isMobile}
+                    >
+                        Add Customer (Alt+n)
+                    </Button>
+                </Box>
             </Box>
 
             {/* Search Bar */}
@@ -234,8 +254,9 @@ export default function CustomersPage() {
                 <CardContent>
                     <TextField
                         fullWidth
+                        inputRef={searchInputRef}
                         size="small"
-                        placeholder="Search customers by name, phone, or email..."
+                        placeholder="Search customers by name, phone, or email... (Alt+f)"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         InputProps={{

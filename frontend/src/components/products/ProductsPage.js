@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
     Container,
@@ -39,6 +39,7 @@ import {
     Error as ErrorIcon,
     Close,
     LocalPharmacy,
+    Keyboard
 } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
@@ -47,9 +48,12 @@ import { formatDate, getExpiryStatus, getStockStatus } from '../../utils/dateHel
 import useSettings from '../../hooks/useSettings';
 import ConfirmDialog from '../shared/ConfirmDialog';
 import MedicineSearchAutocomplete from '../shared/MedicineSearchAutocomplete';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function ProductsPage() {
     const { settings } = useSettings();
+    const { toggleHelp } = useKeyboard();
     const [searchParams, setSearchParams] = useSearchParams();
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
@@ -80,6 +84,13 @@ export default function ProductsPage() {
         price_per_box: '',
         selling_unit: 'item',
     });
+
+    const searchInputRef = useRef(null);
+
+    useKeyboardShortcuts({
+        'Alt+n': () => handleOpenDialog(),
+        'Alt+f': () => searchInputRef.current?.focus(),
+    }, 'Products Page');
 
     useEffect(() => {
         fetchSuppliers();
@@ -365,14 +376,24 @@ export default function ProductsPage() {
                 <Typography variant="h4" fontWeight={700} color="primary">
                     Products
                 </Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => handleOpenDialog()}
-                    fullWidth={isMobile}
-                >
-                    Add Product
-                </Button>
+                <Box display="flex" gap={1}>
+                    <Button
+                        variant="outlined"
+                        startIcon={<Keyboard />}
+                        onClick={toggleHelp}
+                        size={isMobile ? 'small' : 'medium'}
+                    >
+                        Shortcuts
+                    </Button>
+                    <Button
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={() => handleOpenDialog()}
+                        fullWidth={isMobile}
+                    >
+                        Add Product (Alt+n)
+                    </Button>
+                </Box>
             </Box>
 
             {/* Active Filter Indicator */}
@@ -399,7 +420,8 @@ export default function ProductsPage() {
                 <CardContent>
                     <TextField
                         fullWidth
-                        placeholder="Search products by name, form, or batch number..."
+                        inputRef={searchInputRef}
+                        placeholder="Search products by name, form, or batch number... (Alt+f)"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         InputProps={{

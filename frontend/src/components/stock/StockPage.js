@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     Container,
     Card,
@@ -23,16 +23,19 @@ import {
     InputAdornment,
     TablePagination,
 } from '@mui/material';
-import { Add, LocalShipping, Search } from '@mui/icons-material';
+import { Add, LocalShipping, Search, Keyboard } from '@mui/icons-material';
 import { toast } from 'react-toastify';
 import { supabase } from '../../supabaseClient';
 import { formatCurrency, formatNumber } from '../../utils/formatters';
 import { formatDate, getExpiryStatus, getStockStatus } from '../../utils/dateHelpers';
 import { openWhatsAppOrder } from '../../utils/whatsappHelper';
 import useSettings from '../../hooks/useSettings';
+import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
+import { useKeyboard } from '../../contexts/KeyboardContext';
 
 export default function StockPage() {
     const { settings } = useSettings();
+    const { toggleHelp } = useKeyboard();
     const [products, setProducts] = useState([]);
     const [suppliers, setSuppliers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -50,6 +53,12 @@ export default function StockPage() {
         received_date: new Date().toISOString().split('T')[0],
         notes: '',
     });
+
+    const searchInputRef = useRef(null);
+
+    useKeyboardShortcuts({
+        'Alt+f': () => searchInputRef.current?.focus(),
+    }, 'Stock Page');
 
     useEffect(() => {
         fetchSuppliers();
@@ -198,9 +207,18 @@ export default function StockPage() {
 
     return (
         <Container maxWidth="xl">
-            <Typography variant="h4" fontWeight={700} color="primary" mb={3}>
-                Stock Management
-            </Typography>
+            <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+                <Typography variant="h4" fontWeight={700} color="primary">
+                    Stock Management
+                </Typography>
+                <Button
+                    variant="outlined"
+                    startIcon={<Keyboard />}
+                    onClick={toggleHelp}
+                >
+                    Shortcuts
+                </Button>
+            </Box>
 
             <Card>
                 <CardContent>
@@ -210,8 +228,9 @@ export default function StockPage() {
 
                     <TextField
                         fullWidth
+                        inputRef={searchInputRef}
                         size="small"
-                        placeholder="Search products..."
+                        placeholder="Search products... (Alt+f)"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         sx={{ mb: 2 }}
