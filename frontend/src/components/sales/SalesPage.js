@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import {
     Container,
     Card,
@@ -48,10 +48,12 @@ import useSettings from '../../hooks/useSettings';
 import useKeyboardShortcuts from '../../hooks/useKeyboardShortcuts';
 import DailySales from './DailySales';
 import ReceiptModal from '../shared/ReceiptModal';
+import AddCustomerDialog from './AddCustomerDialog';
 
 export default function SalesPage() {
     const { settings } = useSettings();
     const [searchParams] = useSearchParams();
+    const location = useLocation();
 
     // -- State --
     const [products, setProducts] = useState([]);
@@ -60,6 +62,8 @@ export default function SalesPage() {
     const [receiptModalOpen, setReceiptModalOpen] = useState(false);
     const [receiptData, setReceiptData] = useState({ invoice: null, items: [] });
     const [helpOpen, setHelpOpen] = useState(false);
+    const [addCustomerDialogOpen, setAddCustomerDialogOpen] = useState(false);
+    const [newCustomerName, setNewCustomerName] = useState('');
 
     // Cart & Selection
     const [cart, setCart] = useState([]);
@@ -87,6 +91,14 @@ export default function SalesPage() {
         }
     }, []);
 
+    // Handle reorder from Sales History
+    useEffect(() => {
+        const reorderInvoiceId = location.state?.reorderInvoiceId;
+        if (reorderInvoiceId && cart.length === 0) {
+            loadInvoiceItems(reorderInvoiceId);
+        }
+    }, [location.state?.reorderInvoiceId]);
+
     // -- Data Fetching --
     async function fetchCustomers() {
         const { data: { session } } = await supabase.auth.getSession();
@@ -101,6 +113,46 @@ export default function SalesPage() {
             .order('name');
         setCustomers(data || []);
     }
+
+    const loadInvoiceItems = async (invoiceId) => {
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+
+            // Fetch sales items for this invoice
+            const { data: salesItems, error } = await supabase
+                .from('sales')
+                .select('*, products(*)')
+                .eq('invoice_id', invoiceId)
+                .is('deleted_at', null);
+
+            if (error) throw error;
+
+            if (salesItems && salesItems.length > 0) {
+                // Convert sales items to cart format
+                const cartItems = salesItems.map(sale => {
+                    const product = sale.products;
+                    if (!product) return null;
+
+                    return {
+                        product: product,
+                        quantity: sale.quantity,
+                        price: parseFloat(sale.price_at_sale),
+                        selling_unit: sale.selling_unit || 'item',
+                        total: sale.quantity * parseFloat(sale.price_at_sale)
+                    };
+                }).filter(item => item !== null);
+
+                setCart(cartItems);
+                toast.success(`Loaded ${cartItems.length} items from previous invoice. You can now edit and complete the sale.`);
+            } else {
+                toast.warning('No items found for this invoice.');
+            }
+        } catch (error) {
+            console.error('Error loading invoice items:', error);
+            toast.error('Failed to load invoice items');
+        }
+    };
 
     const searchProducts = async (query) => {
         if (!query || query.length < 2) {
@@ -521,11 +573,68 @@ export default function SalesPage() {
                             </Grid>
                             <Grid item xs={12} md={4}>
                                 <Autocomplete
+                                    freeSolo
                                     options={customers}
-                                    getOptionLabel={(option) => option.name}
+                                    getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
                                     value={selectedCustomer}
-                                    onChange={(e, val) => setSelectedCustomer(val)}
-                                    renderInput={(params) => <TextField {...params} inputRef={customerInputRef} label="Customer (Optional) (F3)" fullWidth size="small" />}
+                                    onChange={(e, val) => {
+                                        if (typeof val === 'string') {
+                                            // User typed a new name
+                                            setNewCustomerName(val);
+                                            setAddCustomerDialogOpen(true);
+                                        } else {
+                                            setSelectedCustomer(val);
+                                        }
+                                    }}
+                                    onInputChange={(e, value, reason) => {
+                                        if (reason === 'input' && value && !customers.some(c => c.name.toLowerCase() === value.toLowerCase())) {
+                                            // Track the typed value for potential new customer
+                                            setNewCustomerName(value);
+                                        }
+                                    }}
+                                    filterOptions={(options, params) => {
+                                        const filtered = options.filter(option =>
+                                            option.name.toLowerCase().includes(params.inputValue.toLowerCase())
+                                        );
+
+                                        // Add "Add new customer" option if input doesn't match any existing
+                                        if (params.inputValue !== '' && !options.some(o => o.name.toLowerCase() === params.inputValue.toLowerCase())) {
+                                            filtered.push({
+                                                name: `➕ Add "${params.inputValue}"`,
+                                                id: '__add_new__',
+                                                isAddNew: true,
+                                                inputValue: params.inputValue
+                                            });
+                                        }
+                                        return filtered;
+                                    }}
+                                    renderOption={(props, option) => {
+                                        if (option.isAddNew) {
+                                            return (
+                                                <li {...props} onClick={() => {
+                                                    setNewCustomerName(option.inputValue);
+                                                    setAddCustomerDialogOpen(true);
+                                                }}>
+                                                    <Box display="flex" alignItems="center" gap={1} width="100%">
+                                                        <Typography variant="body2" color="primary" fontWeight={600}>
+                                                            {option.name}
+                                                        </Typography>
+                                                    </Box>
+                                                </li>
+                                            );
+                                        }
+                                        return <li {...props}>{option.name}</li>;
+                                    }}
+                                    renderInput={(params) => (
+                                        <TextField
+                                            {...params}
+                                            inputRef={customerInputRef}
+                                            label="Customer (Optional) (F3)"
+                                            fullWidth
+                                            size="small"
+                                            helperText="Type new name to add customer"
+                                        />
+                                    )}
                                 />
                             </Grid>
                         </Grid>
@@ -731,6 +840,22 @@ export default function SalesPage() {
                 invoice={receiptData.invoice}
                 items={receiptData.items}
                 settings={settings}
+            />
+
+            <AddCustomerDialog
+                open={addCustomerDialogOpen}
+                onClose={() => {
+                    setAddCustomerDialogOpen(false);
+                    setNewCustomerName('');
+                }}
+                initialName={newCustomerName}
+                onCustomerAdded={(newCustomer) => {
+                    setCustomers(prev => [...prev, newCustomer]);
+                    setSelectedCustomer(newCustomer);
+                    setAddCustomerDialogOpen(false);
+                    setNewCustomerName('');
+                    toast.success(`${newCustomer.name} selected for this sale`);
+                }}
             />
         </Container>
     );

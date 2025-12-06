@@ -19,6 +19,10 @@ import {
     TableRow,
     Autocomplete,
     Divider,
+    Card,
+    CardContent,
+    useTheme,
+    useMediaQuery,
 } from '@mui/material';
 import { Add, Delete, ShoppingCart } from '@mui/icons-material';
 import { toast } from 'react-toastify';
@@ -26,6 +30,8 @@ import { supabase } from '../../supabaseClient';
 
 export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppliers }) {
     const isEdit = !!purchaseOrder;
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
     const [formData, setFormData] = useState({
         supplier_id: '',
@@ -146,6 +152,16 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
         }
 
         setItems(newItems);
+    };
+
+    const handleKeyDown = (e, index) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            // Move to next field or add new item if on last item
+            if (index === items.length - 1) {
+                handleAddItem();
+            }
+        }
     };
 
     const handleSubmit = async () => {
@@ -309,77 +325,159 @@ export default function CreateEditPODialog({ open, onClose, purchaseOrder, suppl
                                 Add Item
                             </Button>
                         </Box>
-                        <TableContainer>
-                            <Table size="small">
-                                <TableHead>
-                                    <TableRow>
-                                        <TableCell><strong>Product</strong></TableCell>
-                                        <TableCell width="100"><strong>Boxes</strong></TableCell>
-                                        <TableCell width="100"><strong>Items/Box</strong></TableCell>
-                                        <TableCell width="120"><strong>Total Items</strong></TableCell>
-                                        <TableCell width="50"></TableCell>
-                                    </TableRow>
-                                </TableHead>
-                                <TableBody>
-                                    {items.map((item, index) => (
-                                        <TableRow key={index}>
-                                            <TableCell>
-                                                <Autocomplete
-                                                    size="small"
-                                                    options={products}
-                                                    getOptionLabel={(option) => option.name || ''}
-                                                    value={products.find(p => p.id === item.product_id) || null}
-                                                    onChange={(e, newValue) => {
-                                                        handleItemChange(index, 'product_id', newValue?.id || '');
-                                                    }}
-                                                    renderInput={(params) => (
-                                                        <TextField {...params} placeholder="Select product" />
-                                                    )}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    size="small"
-                                                    fullWidth
-                                                    type="number"
-                                                    placeholder="Boxes"
-                                                    value={item.boxes_ordered}
-                                                    onChange={(e) => handleItemChange(index, 'boxes_ordered', e.target.value)}
-                                                    inputProps={{ min: 1 }}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    size="small"
-                                                    fullWidth
-                                                    type="number"
-                                                    placeholder="Per Box"
-                                                    value={item.items_per_box}
-                                                    onChange={(e) => handleItemChange(index, 'items_per_box', e.target.value)}
-                                                    inputProps={{ min: 1 }}
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <TextField
-                                                    size="small"
-                                                    fullWidth
-                                                    type="number"
-                                                    value={item.quantity_ordered}
-                                                    onChange={(e) => handleItemChange(index, 'quantity_ordered', e.target.value)}
-                                                    inputProps={{ min: 1 }}
-                                                    helperText="Total Units"
-                                                />
-                                            </TableCell>
-                                            <TableCell>
-                                                <IconButton size="small" color="error" onClick={() => handleRemoveItem(index)}>
-                                                    <Delete fontSize="small" />
-                                                </IconButton>
-                                            </TableCell>
+
+                        {isMobile ? (
+                            // Mobile view - Cards instead of table
+                            <Box>
+                                {items.map((item, index) => (
+                                    <Card key={index} variant="outlined" sx={{ mb: 2 }}>
+                                        <CardContent>
+                                            <Grid container spacing={2}>
+                                                <Grid item xs={12}>
+                                                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={1}>
+                                                        <Typography variant="subtitle2" fontWeight={600}>
+                                                            Item #{index + 1}
+                                                        </Typography>
+                                                        <IconButton size="small" color="error" onClick={() => handleRemoveItem(index)}>
+                                                            <Delete fontSize="small" />
+                                                        </IconButton>
+                                                    </Box>
+                                                </Grid>
+                                                <Grid item xs={12}>
+                                                    <Autocomplete
+                                                        size="small"
+                                                        options={products}
+                                                        getOptionLabel={(option) => option.name || ''}
+                                                        value={products.find(p => p.id === item.product_id) || null}
+                                                        onChange={(e, newValue) => {
+                                                            handleItemChange(index, 'product_id', newValue?.id || '');
+                                                        }}
+                                                        renderInput={(params) => (
+                                                            <TextField {...params} label="Product" placeholder="Select product" />
+                                                        )}
+                                                    />
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <TextField
+                                                        size="small"
+                                                        fullWidth
+                                                        type="number"
+                                                        label="Boxes"
+                                                        placeholder="Boxes"
+                                                        value={item.boxes_ordered}
+                                                        onChange={(e) => handleItemChange(index, 'boxes_ordered', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, index)}
+                                                        inputProps={{ min: 1 }}
+                                                    />
+                                                </Grid>
+                                                <Grid item xs={6}>
+                                                    <TextField
+                                                        size="small"
+                                                        fullWidth
+                                                        type="number"
+                                                        label="Items/Box"
+                                                        placeholder="Per Box"
+                                                        value={item.items_per_box}
+                                                        onChange={(e) => handleItemChange(index, 'items_per_box', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, index)}
+                                                        inputProps={{ min: 1 }}
+                                                    />
+                                                </Grid>
+                                                <Grid item xs={12}>
+                                                    <TextField
+                                                        size="small"
+                                                        fullWidth
+                                                        type="number"
+                                                        label="Total Items"
+                                                        value={item.quantity_ordered}
+                                                        onChange={(e) => handleItemChange(index, 'quantity_ordered', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, index)}
+                                                        inputProps={{ min: 1 }}
+                                                        helperText="Total Units"
+                                                    />
+                                                </Grid>
+                                            </Grid>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </Box>
+                        ) : (
+                            // Desktop view - Table
+                            <TableContainer>
+                                <Table size="small">
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell><strong>Product</strong></TableCell>
+                                            <TableCell width="100"><strong>Boxes</strong></TableCell>
+                                            <TableCell width="100"><strong>Items/Box</strong></TableCell>
+                                            <TableCell width="120"><strong>Total Items</strong></TableCell>
+                                            <TableCell width="50"></TableCell>
                                         </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </TableContainer>
+                                    </TableHead>
+                                    <TableBody>
+                                        {items.map((item, index) => (
+                                            <TableRow key={index}>
+                                                <TableCell>
+                                                    <Autocomplete
+                                                        size="small"
+                                                        options={products}
+                                                        getOptionLabel={(option) => option.name || ''}
+                                                        value={products.find(p => p.id === item.product_id) || null}
+                                                        onChange={(e, newValue) => {
+                                                            handleItemChange(index, 'product_id', newValue?.id || '');
+                                                        }}
+                                                        renderInput={(params) => (
+                                                            <TextField {...params} placeholder="Select product" />
+                                                        )}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <TextField
+                                                        size="small"
+                                                        fullWidth
+                                                        type="number"
+                                                        placeholder="Boxes"
+                                                        value={item.boxes_ordered}
+                                                        onChange={(e) => handleItemChange(index, 'boxes_ordered', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, index)}
+                                                        inputProps={{ min: 1 }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <TextField
+                                                        size="small"
+                                                        fullWidth
+                                                        type="number"
+                                                        placeholder="Per Box"
+                                                        value={item.items_per_box}
+                                                        onChange={(e) => handleItemChange(index, 'items_per_box', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, index)}
+                                                        inputProps={{ min: 1 }}
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <TextField
+                                                        size="small"
+                                                        fullWidth
+                                                        type="number"
+                                                        value={item.quantity_ordered}
+                                                        onChange={(e) => handleItemChange(index, 'quantity_ordered', e.target.value)}
+                                                        onKeyDown={(e) => handleKeyDown(e, index)}
+                                                        inputProps={{ min: 1 }}
+                                                        helperText="Total Units"
+                                                    />
+                                                </TableCell>
+                                                <TableCell>
+                                                    <IconButton size="small" color="error" onClick={() => handleRemoveItem(index)}>
+                                                        <Delete fontSize="small" />
+                                                    </IconButton>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        )}
                     </Grid>
 
                     <Grid item xs={12}>

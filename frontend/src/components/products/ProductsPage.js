@@ -261,6 +261,18 @@ export default function ProductsPage() {
         });
     };
 
+    const handleKeyDown = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const form = e.target.form;
+            const index = Array.prototype.indexOf.call(form, e.target);
+            const nextElement = form.elements[index + 1];
+            if (nextElement && nextElement.type !== 'submit') {
+                nextElement.focus();
+            }
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -716,6 +728,7 @@ export default function ProductsPage() {
                                     name="name"
                                     value={formData.name}
                                     onChange={handleChange}
+                                    onKeyDown={handleKeyDown}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
