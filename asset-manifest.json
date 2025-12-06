@@ -1,9 +1,9 @@
 {
   "files": {
     "main.css": "/Asad-Clanic-and-Pharmacy/static/css/main.c9fbee29.css",
-    "main.js": "/Asad-Clanic-and-Pharmacy/static/js/main.45c923e6.js",
-    "static/js/27.42500f59.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/27.42500f59.chunk.js",
-    "static/js/115.4f5b45a1.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/115.4f5b45a1.chunk.js",
+    "main.js": "/Asad-Clanic-and-Pharmacy/static/js/main.1c45f194.js",
+    "static/js/27.e2d7b772.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/27.e2d7b772.chunk.js",
+    "static/js/115.662013e4.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/115.662013e4.chunk.js",
     "static/js/887.566dd91a.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/887.566dd91a.chunk.js",
     "static/js/83.8964c88e.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/83.8964c88e.chunk.js",
     "static/js/678.ade30d2f.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/678.ade30d2f.chunk.js",
@@ -35,9 +35,9 @@
     "static/js/249.a3fe3375.chunk.js": "/Asad-Clanic-and-Pharmacy/static/js/249.a3fe3375.chunk.js",
     "index.html": "/Asad-Clanic-and-Pharmacy/index.html",
     "main.c9fbee29.css.map": "/Asad-Clanic-and-Pharmacy/static/css/main.c9fbee29.css.map",
-    "main.45c923e6.js.map": "/Asad-Clanic-and-Pharmacy/static/js/main.45c923e6.js.map",
-    "27.42500f59.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/27.42500f59.chunk.js.map",
-    "115.4f5b45a1.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/115.4f5b45a1.chunk.js.map",
+    "main.1c45f194.js.map": "/Asad-Clanic-and-Pharmacy/static/js/main.1c45f194.js.map",
+    "27.e2d7b772.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/27.e2d7b772.chunk.js.map",
+    "115.662013e4.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/115.662013e4.chunk.js.map",
     "887.566dd91a.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/887.566dd91a.chunk.js.map",
     "83.8964c88e.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/83.8964c88e.chunk.js.map",
     "678.ade30d2f.chunk.js.map": "/Asad-Clanic-and-Pharmacy/static/js/678.ade30d2f.chunk.js.map",
@@ -70,6 +70,6 @@
   },
   "entrypoints": [
     "static/css/main.c9fbee29.css",
-    "static/js/main.45c923e6.js"
+    "static/js/main.1c45f194.js"
   ]
 }
