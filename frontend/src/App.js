@@ -1,5 +1,5 @@
 import React, { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { Box, CircularProgress } from '@mui/material';
@@ -50,7 +50,7 @@ export default function App() {
       <CssBaseline />
       <AuthProvider>
         <KeyboardProvider>
-          <Router basename={window.location.pathname.startsWith('/Asad-Clanic-and-Pharmacy') ? '/Asad-Clanic-and-Pharmacy' : ''}>
+          <Router>
             <Suspense fallback={<LoadingFallback />}>
               <Routes>
                 {/* Public Route */}

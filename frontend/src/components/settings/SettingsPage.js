@@ -371,7 +371,7 @@ export default function SettingsPage() {
                                                         </ListItemIcon>
                                                         <ListItemText
                                                             primary="Customer Support"
-                                                            secondary="+92 300 1234567"
+                                                            secondary="+92 308 9020131"
                                                         />
                                                     </ListItem>
                                                     <ListItem>
@@ -380,7 +380,7 @@ export default function SettingsPage() {
                                                         </ListItemIcon>
                                                         <ListItemText
                                                             primary="Email Support"
-                                                            secondary="support@medicalstoreaudit.com"
+                                                            secondary="tanveert9021@gmail.com"
                                                         />
                                                     </ListItem>
                                                     <ListItem>
@@ -389,7 +389,7 @@ export default function SettingsPage() {
                                                         </ListItemIcon>
                                                         <ListItemText
                                                             primary="WhatsApp"
-                                                            secondary="+92 300 1234567"
+                                                            secondary="+92 347 6473031"
                                                         />
                                                     </ListItem>
                                                 </List>
@@ -403,7 +403,7 @@ export default function SettingsPage() {
                                         variant="contained"
                                         color="success"
                                         startIcon={<WhatsApp />}
-                                        href="https://wa.me/923001234567"
+                                        href="https://wa.me/923476473031"
                                         target="_blank"
                                         size="large"
                                     >

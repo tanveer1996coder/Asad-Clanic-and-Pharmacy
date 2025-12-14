@@ -39,6 +39,7 @@ export default function Dashboard() {
     const [stats, setStats] = useState({
         todaySales: 0,
         todayRevenue: 0,
+        todayCashOut: 0,
         lowStockCount: 0,
         nearExpiryCount: 0,
         totalProducts: 0,
@@ -72,6 +73,7 @@ export default function Dashboard() {
                 setStats({
                     todaySales: s.today_sales_count,
                     todayRevenue: s.today_revenue,
+                    todayCashOut: s.today_cash_out || 0, // Handle potential undefined if migration not run
                     lowStockCount: s.low_stock_count,
                     nearExpiryCount: s.near_expiry_count,
                     totalProducts: s.total_products_count,
@@ -143,6 +145,8 @@ export default function Dashboard() {
         );
     }
 
+    const netCashInHouse = stats.todayRevenue - (stats.todayCashOut || 0);
+
     return (
         <Container maxWidth="xl">
             <Box
@@ -187,12 +191,13 @@ export default function Dashboard() {
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>
                     <StatsCard
-                        title="Total Products"
-                        value={formatNumber(stats.totalProducts)}
-                        subtitle={`${formatNumber(stats.totalStock)} units in stock`}
-                        icon={<Inventory />}
-                        color="info"
-                        onClick={() => navigate('/products')}
+                        title="Daily Cash Flow"
+                        value={formatCurrency(netCashInHouse, settings.currency_symbol)}
+                        subtitle={`In: ${formatNumber(stats.todayRevenue)} | Out: ${formatNumber(stats.todayCashOut || 0)}`}
+                        icon={<AttachMoney />}
+                        color={netCashInHouse >= 0 ? "success" : "error"}
+                        alert={netCashInHouse < 0}
+                        onClick={() => {}} // No specific navigation for now
                     />
                 </Grid>
                 <Grid item xs={12} sm={6} md={3}>

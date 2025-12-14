@@ -43,14 +43,14 @@ const drawerWidth = 260;
 const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
     { text: 'Sales', icon: <ShoppingCartIcon />, path: '/sales' },
+    { text: 'Purchase Orders', icon: <ShoppingCartIcon />, path: '/purchase-orders' },
     { text: 'Products', icon: <InventoryIcon />, path: '/products' },
     { text: 'Stock', icon: <LocalShippingIcon />, path: '/stock' },
-    { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
+    { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
     { text: 'Sales History', icon: <AssessmentIcon />, path: '/sales-history' },
-    { text: 'Purchase Orders', icon: <ShoppingCartIcon />, path: '/purchase-orders' },
+    { text: 'Customers', icon: <PeopleIcon />, path: '/customers' },
     { text: 'Suppliers', icon: <PeopleIcon />, path: '/suppliers' },
     { text: 'Medicine Reference', icon: <LocalPharmacyIcon />, path: '/medicine-reference' },
-    { text: 'Reports', icon: <AssessmentIcon />, path: '/reports' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },
     { text: 'User Guide', icon: <StoreIcon />, path: '/guide' },
 ];

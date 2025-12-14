@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { getDeviceId, getDeviceName } from '../utils/deviceUtils';
 
 const AuthContext = createContext({});
 
@@ -75,7 +76,6 @@ export const AuthProvider = ({ children }) => {
 
         // Device Verification Logic
         try {
-            const { getDeviceId, getDeviceName } = require('../utils/deviceUtils');
             const deviceId = getDeviceId();
             const deviceName = getDeviceName();
             const userId = data.user.id;
